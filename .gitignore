@@ -1,0 +1,12 @@
+# 运行时文件
+.server.pid
+.server.log
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# IDE
+.deepvcode/
+.vscode/

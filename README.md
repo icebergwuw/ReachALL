@@ -1,92 +1,149 @@
-# ReachALL
+# ReachALL — 推广情报中台
 
+EasyClaw 社媒推广辅助系统。实时聚合国内主流平台热榜，并通过 MiniMax LLM 一键生成 EasyClaw 推广内容。
 
+---
 
-## Getting started
+## 项目是什么
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+面向 EasyClaw 产品推广团队的内部工具。核心功能：
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+1. **热榜监控** — 实时抓取微博、抖音、B站、V2EX、小红书的热点话题，展示热度、排名
+2. **AI 推文生成** — 选中任意热点 → 选目标平台 + 语气风格 → 调 MiniMax M2.7 生成推广文案
+3. **推文库** — 保存历史生成记录，方便回顾和复用
 
-## Add your files
+---
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+## 技术栈
+
+| 层 | 技术 |
+|----|------|
+| 前端 | 单文件 `index.html`（原生 HTML/CSS/JS，无构建工具） |
+| 后端 | Python + FastAPI，运行在 `localhost:8765` |
+| 数据抓取 | 直接调各平台公开 API；V2EX 走 `agent-reach` 库 |
+| LLM | MiniMax M2.7（`https://api.minimaxi.com/v1/chat/completions`） |
+| 进程管理 | `start.sh` + `nohup` + `.server.pid` |
+
+---
+
+## 目录结构
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.liebaopay.com/wuyou1/ReachALL.git
-git branch -M master
-git push -uf origin master
+ReachALL/
+├── index.html        # 前端单页应用
+├── server.py         # FastAPI 后端（数据聚合 + LLM 生成）
+├── start.sh          # 后端进程管理脚本
+├── .server.pid       # 后台进程 PID（运行时自动生成）
+└── .server.log       # 后台日志（运行时自动生成）
 ```
 
-## Integrate with your tools
+外部依赖（不在项目目录内）：
 
-- [ ] [Set up project integrations](https://gitlab.liebaopay.com/wuyou1/ReachALL/-/settings/integrations)
+```
+~/.agent-reach/
+├── config.yaml           # Twitter 等平台的 API token
+└── xhs-cookies.json      # 小红书登录 cookie（需手动更新）
 
-## Collaborate with your team
+~/.hermes/.env            # MiniMax API key 存放位置（server.py 中硬编码使用）
+~/.local/pipx/venvs/agent-reach/  # agent-reach Python 环境
+```
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+---
 
-## Test and Deploy
+## 启动方式
 
-Use the built-in continuous integration in GitLab.
+```bash
+# 后台启动（推荐）
+./start.sh start
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+# 查看状态
+./start.sh status
 
-***
+# 停止
+./start.sh stop
 
-# Editing this README
+# 重启
+./start.sh restart
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
+# 前台启动（看实时日志）
+./start.sh
+```
 
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+后端启动后，直接用浏览器打开 `index.html` 即可使用（无需 web server，本地文件直接打开）。
 
-## Name
-Choose a self-explaining name for your project.
+---
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## API 接口
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/trends` | 全平台热榜，可传 `?platform=weibo\|bilibili\|douyin\|v2ex\|xhs\|all` |
+| GET | `/api/trends/{name}` | 单平台热榜 |
+| POST | `/api/generate` | 生成推文，见下方 payload |
+| POST | `/api/cache/clear` | 清除 5 分钟缓存，强制刷新 |
+| GET | `/api/health` | 服务健康状态 |
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+`/api/generate` 请求体：
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```json
+{
+  "topic_title": "歌手AI海报",
+  "topic_heat": "115万",
+  "topic_platform": "weibo",
+  "target_platform": "weibo",
+  "tone": "营销种草",
+  "extra": ""
+}
+```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+`target_platform` 可选值：`weibo` / `douyin` / `xhs` / `bilibili` / `v2ex`
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+`tone` 可选值：`营销种草` / `专业干货` / `轻松幽默` / `情感共鸣`
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+---
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+## 数据来源说明
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+| 平台 | 接口 | 备注 |
+|------|------|------|
+| 微博 | `weibo.com/ajax/side/hotSearch` | 无需认证，实时 |
+| 抖音 | `iesdouyin.com` 热搜榜 | 无需认证 |
+| B站 | `api.bilibili.com` 排行榜 | 无需认证 |
+| V2EX | agent-reach `V2EXChannel` | 需要 `agent-reach` 安装 |
+| 小红书 | 搜索 API | **需要登录 cookie**，反爬严格，500 时需更新 cookie |
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+---
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+## 更新小红书 Cookie
 
-## License
-For open source projects, say how it is licensed.
+小红书 cookie 有效期短，出现 500 错误时需要手动更新：
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+1. 浏览器登录小红书，打开 DevTools → Application → Cookies
+2. 找到 `web_session` 和 `id_token` 两个值
+3. 更新 `~/.agent-reach/xhs-cookies.json`：
+
+```json
+[
+  {"name": "web_session", "value": "你的值", "domain": ".xiaohongshu.com", "path": "/", "expires": -1, "size": 49, "httpOnly": false, "secure": false, "session": true, "sameSite": "Lax"},
+  {"name": "id_token",    "value": "你的值", "domain": ".xiaohongshu.com", "path": "/", "expires": -1, "size": 144, "httpOnly": false, "secure": false, "session": true, "sameSite": "Lax"}
+]
+```
+
+4. `./start.sh restart` 重启后端
+
+---
+
+## 缓存策略
+
+各平台数据缓存 5 分钟（`CACHE_TTL = 300`），避免频繁请求被封。
+可通过 `POST /api/cache/clear` 或 `./start.sh restart` 强制刷新。
+
+---
+
+## 后续计划
+
+- [ ] 小红书签名算法（`x-s`）支持，绕过反爬
+- [ ] Twitter/X 热搜接入（`~/.agent-reach/config.yaml` 已有 token）
+- [ ] 推文库持久化（目前仅 localStorage）
+- [ ] 多产品支持（当前 system prompt 写死为 EasyClaw）
+- [ ] SDK/API 输出层，支持第三方平台消费数据
