@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "name": "reachall",
+  "builds": [
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "api/**/*.py", "use": "@vercel/python" }
+  ],
+  "routes": [
+    { "src": "/api/trends",          "dest": "/api/trends.py" },
+    { "src": "/api/generate/wechat", "dest": "/api/generate/wechat.py" },
+    { "src": "/api/generate",        "dest": "/api/generate.py" },
+    { "src": "/api/health",          "dest": "/api/health.py" },
+    { "src": "/(.*)",                "dest": "/index.html" }
+  ]
+}

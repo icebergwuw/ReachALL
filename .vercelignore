@@ -1,0 +1,12 @@
+.server.log
+.server.pid
+.DS_Store
+.deepvcode/
+output/
+__pycache__/
+*.pyc
+src/
+skills/
+start.sh
+server.py
+AI*.html

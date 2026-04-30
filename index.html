@@ -1090,7 +1090,7 @@
 
 <script>
 // ── CONFIG ──
-const API_BASE = 'http://localhost:8765';
+const API_BASE = location.hostname === 'localhost' ? 'http://localhost:8765' : '';
 
 // ── STATE ──
 let allTrends = [];
@@ -1483,19 +1483,21 @@ async function generateWechat() {
     if (!data.ok) throw new Error(data.error || '生成失败');
 
     generatedText = data.html;
-    const downloadUrl = `${API_BASE}${data.download_url}`;
+    _wechatHtml = data.html;
+    _wechatFilename = data.filename || 'wechat-article.html';
+    const filename = _wechatFilename;
 
     outputEl.innerHTML = `
       <div style="padding:12px 0 8px;">
         <span style="color:var(--accent);font-weight:600;">✓ 公众号文章已生成</span>
-        <span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${data.filename}</span>
+        <span style="color:var(--text-dim);font-size:12px;margin-left:8px;">${filename}</span>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
-        <a href="${downloadUrl}" download="${data.filename}"
-           style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(255,87,34,0.15);color:#FF5722;border:1px solid rgba(255,87,34,0.3);border-radius:6px;font-size:13px;text-decoration:none;cursor:pointer;">
+        <button onclick="downloadWechatHtml()"
+           style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:rgba(255,87,34,0.15);color:#FF5722;border:1px solid rgba(255,87,34,0.3);border-radius:6px;font-size:13px;cursor:pointer;">
           ↓ 下载 HTML 文件
-        </a>
-        <button onclick="previewWechat('${downloadUrl}')"
+        </button>
+        <button onclick="previewWechat()"
            style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;">
           ↗ 在浏览器预览
         </button>
@@ -1516,8 +1518,23 @@ async function generateWechat() {
   isGenerating = false;
 }
 
-function previewWechat(url) {
-  window.open(url, '_blank');
+let _wechatHtml = '';
+let _wechatFilename = 'wechat-article.html';
+
+function downloadWechatHtml() {
+  if (!generatedText) return;
+  const blob = new Blob([generatedText], { type: 'text/html;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = _wechatFilename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function previewWechat() {
+  if (!generatedText) return;
+  const blob = new Blob([generatedText], { type: 'text/html;charset=utf-8' });
+  window.open(URL.createObjectURL(blob), '_blank');
 }
 
 function escapeHtml(s) {
