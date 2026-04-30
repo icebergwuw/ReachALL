@@ -614,6 +614,7 @@
     .plat-select-btn.active.wb { background: rgba(230,22,45,0.1); color: #e6162d; border-color: #e6162d; }
     .plat-select-btn.active.dy { background: rgba(254,44,85,0.1); color: #fe2c55; border-color: #fe2c55; }
     .plat-select-btn.active.xhs { background: rgba(255,36,66,0.08); color: #ff6680; border-color: #ff6680; }
+    .plat-select-btn.active.wx { background: rgba(255,87,34,0.1); color: #FF5722; border-color: #FF5722; }
 
     .form-textarea {
       width: 100%;
@@ -1029,6 +1030,7 @@
             <button class="plat-select-btn active wb" data-plat="weibo" onclick="selectPlat(this)">微博</button>
             <button class="plat-select-btn dy" data-plat="douyin" onclick="selectPlat(this)">抖音</button>
             <button class="plat-select-btn xhs" data-plat="xhs" onclick="selectPlat(this)">小红书</button>
+            <button class="plat-select-btn wx" data-plat="wechat" onclick="selectPlat(this)">微信公众号</button>
           </div>
         </div>
 
@@ -1057,17 +1059,11 @@
         </div>
 
         <div class="gen-actions">
-          <button class="gen-btn primary" id="gen-btn" onclick="generatePost()">
+          <button class="gen-btn primary" id="gen-btn" onclick="handleGenerate()">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
               <polygon points="3,2 13,8 3,14"/>
             </svg>
-            生成推文
-          </button>
-          <button class="gen-btn" id="wechat-btn" onclick="generateWechat()" style="background:rgba(255,87,34,0.12);color:#FF5722;border-color:rgba(255,87,34,0.3);">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            公众号文章
+            <span id="gen-btn-label">生成推文</span>
           </button>
           <button class="gen-btn secondary" id="save-btn" onclick="saveToLibrary()" style="display:none">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -1343,6 +1339,21 @@ function selectPlat(btn) {
   document.querySelectorAll('.plat-select-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   currentPlatform = btn.dataset.plat;
+  // 公众号平台：更新生成按钮文案
+  const genLabel = document.getElementById('gen-btn-label');
+  if (currentPlatform === 'wechat') {
+    genLabel.textContent = '生成公众号文章';
+  } else {
+    genLabel.textContent = '生成推文';
+  }
+}
+
+function handleGenerate() {
+  if (currentPlatform === 'wechat') {
+    generateWechat();
+  } else {
+    generatePost();
+  }
 }
 
 function selectTone(btn) {
