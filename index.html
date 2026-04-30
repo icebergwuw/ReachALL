@@ -1451,11 +1451,9 @@ async function generateWechat() {
   if (isGenerating || !currentTopic) return;
   isGenerating = true;
 
-  const btn = document.getElementById('wechat-btn');
   const genBtn = document.getElementById('gen-btn');
-  btn.disabled = true;
   genBtn.disabled = true;
-  btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M14 8A6 6 0 1 1 8 2"/></svg> 生成中…`;
+  genBtn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite"><path d="M14 8A6 6 0 1 1 8 2"/></svg> 生成中…`;
 
   const extra = document.getElementById('extra-prompt').value;
 
@@ -1513,9 +1511,8 @@ async function generateWechat() {
     setTimeout(() => { outputEl.style.color = ''; }, 3000);
   }
 
-  btn.disabled = false;
   genBtn.disabled = false;
-  btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> 公众号文章`;
+  genBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3,2 13,8 3,14"/></svg> <span id="gen-btn-label">生成公众号文章</span>`;
   isGenerating = false;
 }
 
