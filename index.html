@@ -1034,7 +1034,7 @@
           </div>
         </div>
 
-        <div class="form-row">
+        <div class="form-row" id="tone-row">
           <label class="form-label">语气风格</label>
           <div class="tone-grid">
             <button class="tone-btn active" data-tone="营销种草" onclick="selectTone(this)">营销种草</button>
@@ -1340,11 +1340,14 @@ function selectPlat(btn) {
   document.querySelectorAll('.plat-select-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   currentPlatform = btn.dataset.plat;
-  // 公众号平台：更新生成按钮文案
+  // 公众号：隐藏语气风格，更新按钮文案
+  const toneRow = document.getElementById('tone-row');
   const genLabel = document.getElementById('gen-btn-label');
   if (currentPlatform === 'wechat') {
+    toneRow.style.display = 'none';
     genLabel.textContent = '生成公众号文章';
   } else {
+    toneRow.style.display = '';
     genLabel.textContent = '生成推文';
   }
 }
@@ -1472,8 +1475,6 @@ async function generateWechat() {
         topic_title: currentTopic.title,
         topic_heat: currentTopic.heatLabel || '',
         topic_platform: currentTopic.platform,
-        article_type: '产品介绍',
-        tone: currentTone === '营销种草' ? '亲切简洁' : currentTone,
         extra: extra,
       }),
       signal: AbortSignal.timeout(180000),
