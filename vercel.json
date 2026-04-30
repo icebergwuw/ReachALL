@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "name": "reachall",
   "builds": [
     { "src": "index.html", "use": "@vercel/static" },
     { "src": "api/**/*.py", "use": "@vercel/python" }

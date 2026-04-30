@@ -5,7 +5,7 @@ Body: { topic_title, topic_heat, topic_platform, target_platform, tone, extra }
 import json, sys, os
 from http.server import BaseHTTPRequestHandler
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 from _lib import call_minimax, SYSTEM_PROMPT, PLATFORM_GUIDES, TONE_GUIDES
 
 

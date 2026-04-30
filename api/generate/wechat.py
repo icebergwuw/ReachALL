@@ -6,7 +6,7 @@ Returns: { ok, html, filename }
 import json, sys, os, re
 from http.server import BaseHTTPRequestHandler
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
 from _lib import call_minimax, WECHAT_SYSTEM_PROMPT
 
 

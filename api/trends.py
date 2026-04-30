@@ -5,7 +5,7 @@ import json, sys, os, time
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 from _lib import fetch_weibo, fetch_bilibili, fetch_douyin, fetch_v2ex
 
 
