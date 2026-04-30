@@ -1148,7 +1148,7 @@ async function loadTrends() {
 
   if (serverOnline) {
     try {
-      const res = await fetch(`${API_BASE}/api/trends`, { signal: AbortSignal.timeout(15000) });
+      const res = await fetch(`${API_BASE}/api/trends`, { signal: AbortSignal.timeout(30000) });
       const data = await res.json();
       if (data.ok) {
         items = data.items || [];
@@ -1181,7 +1181,8 @@ async function loadTrends() {
   document.getElementById('stat-dy-peak').textContent = formatHeat(maxDyHeat) || '—';
   document.getElementById('total-badge').textContent = allTrends.length || '—';
   document.getElementById('last-update').textContent =
-    '更新于 ' + new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+    '更新于 ' + new Date((data.updated_at || Date.now() / 1000) * 1000)
+      .toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
 
   btn.classList.remove('spinning');
   updateStats();
@@ -1406,7 +1407,7 @@ async function generatePost() {
         tone: currentTone,
         extra: extra,
       }),
-      signal: AbortSignal.timeout(35000),
+      signal: AbortSignal.timeout(90000),
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || '生成失败');
@@ -1477,7 +1478,7 @@ async function generateWechat() {
         tone: currentTone === '营销种草' ? '亲切简洁' : currentTone,
         extra: extra,
       }),
-      signal: AbortSignal.timeout(120000),
+      signal: AbortSignal.timeout(180000),
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || '生成失败');
@@ -1630,7 +1631,7 @@ function showToast(msg) {
 document.addEventListener('DOMContentLoaded', () => {
   updateStats();
   loadTrends();
-  setInterval(loadTrends, 5 * 60 * 1000);
+  setInterval(loadTrends, 10 * 60 * 1000);
 });
 
 // Keyboard close modal

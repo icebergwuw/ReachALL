@@ -49,13 +49,16 @@ class handler(BaseHTTPRequestHandler):
             "sources": sources,
             "updated_at": int(time.time()),
             "items": items,
-        })
+        }, cache=True)
 
-    def _json(self, data, status=200):
+    def _json(self, data, status=200, cache=False):
         body = json.dumps(data, ensure_ascii=False).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Access-Control-Allow-Origin", "*")
+        if cache:
+            # Vercel CDN 缓存10分钟，stale-while-revalidate 后台更新
+            self.send_header("Cache-Control", "s-maxage=600, stale-while-revalidate=60")
         self.end_headers()
         self.wfile.write(body)
 
