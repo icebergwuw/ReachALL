@@ -367,16 +367,25 @@ EasyClaw 是猎豹移动出品的桌面 AI Agent 工具，基于 OpenClaw 框架
 你的任务：根据当前热点话题，为指定平台创作一条高质量推广内容，将 EasyClaw 的价值自然融入热点。
 要求：真实、自然、不硬广，符合各平台的内容生态。只输出正文内容，不要加任何前缀或解释。"""
 
-def call_dvcode(prompt: str) -> str:
-    """通过 dvcode CLI 调用 DeepV Code (Claude Sonnet) 算力"""
-    full_prompt = SYSTEM_PROMPT + "\n\n" + prompt
+def call_dvcode(prompt: str, system: str = None) -> str:
+    """通过 dvcode CLI 调用 DeepV Code (Claude Sonnet) 算力
+    使用 --output-format json 跳过流式渲染，速度快 10x+
+    """
+    full_prompt = (system or SYSTEM_PROMPT) + "\n\n" + prompt
     result = subprocess.run(
-        [DVCODE_BIN, "-p", full_prompt],
-        capture_output=True, text=True, timeout=120,
+        [DVCODE_BIN, "-p", full_prompt, "--output-format", "json"],
+        capture_output=True, text=True, timeout=300,
     )
-    text = (result.stdout or "").strip()
-    if result.returncode == 0 and text:
-        return text
+    raw = (result.stdout or "").strip()
+    if result.returncode == 0 and raw:
+        # --output-format json 返回 {"model":...,"content":...,"status":...}
+        try:
+            data = json.loads(raw)
+            if isinstance(data, dict) and "content" in data:
+                return data["content"]
+        except json.JSONDecodeError:
+            pass
+        return raw  # fallback: 直接返回原始文本
     raise RuntimeError(f"dvcode 调用失败 (exit {result.returncode}): {result.stderr.strip()[:200]}")
 
 
@@ -473,6 +482,140 @@ async def generate_post(req: GenerateRequest):
         return JSONResponse({"ok": False, "error": "生成超时，请重试"}, status_code=504)
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+# ── 公众号推文生成 ─────────────────────────────────────────────────────────────
+
+# 加载 skill 文件（启动时一次性读取）
+_SKILL_DIR = _HERE / "skills"
+
+def _read_skill_file(path: str) -> str:
+    try:
+        return (_SKILL_DIR / path).read_text(encoding="utf-8")
+    except Exception:
+        return ""
+
+_SKILL_MD = _read_skill_file("SKILL.md")
+_ARTICLE_TEMPLATES = _read_skill_file("references/article-templates.md")
+_HTML_GUIDE = _read_skill_file("references/html-guide.md")
+
+WECHAT_ARTICLE_TYPES = ["产品介绍", "干货分享", "活动回顾"]
+WECHAT_TONES = ["亲切简洁", "专业严肃", "活泼有趣"]
+
+WECHAT_SYSTEM_PROMPT = f"""你是 EasyClaw 品牌微信公众号的资深内容运营，专门创作高质量推文。
+
+{_SKILL_MD}
+
+---
+文章模板参考：
+{_ARTICLE_TEMPLATES}
+
+---
+HTML 排版规范：
+{_HTML_GUIDE}
+"""
+
+class WechatArticleRequest(BaseModel):
+    topic_title: str
+    topic_heat: str = ""
+    topic_platform: str = "weibo"
+    article_type: str = "产品介绍"
+    tone: str = "亲切简洁"
+    extra: str = ""
+
+
+def _build_wechat_prompt(req: WechatArticleRequest) -> str:
+    return f"""你的任务是生成一个完整的微信公众号推文 HTML 文件。
+
+热点话题：「{req.topic_title}」（热度：{req.topic_heat}，来源：{req.topic_platform}）
+文章类型：{req.article_type}
+写作风格：{req.tone}
+{"额外要求：" + req.extra if req.extra else ""}
+
+严格要求：
+1. 只输出 HTML 代码，第一个字符必须是 <，最后一个字符必须是 >
+2. 从 <!DOCTYPE html><html><head><meta charset="UTF-8"></head><body> 开始
+3. 将 EasyClaw 的价值自然融入热点话题
+4. 全部使用 inline style，禁止 flex/grid/border-radius，双列布局用 table
+5. 包含：题图标签橙色胶囊、小标题橙色竖条、正文段落、金句卡（橙底白字）、CTA结尾（橙底）、标签行
+6. 不要输出任何解释文字、markdown、代码块标记，直接输出纯 HTML
+
+现在直接输出 HTML："""
+
+
+@app.post("/api/generate/wechat")
+async def generate_wechat_article(req: WechatArticleRequest):
+    """生成微信公众号推文 + HTML 排版文件"""
+    prompt = _build_wechat_prompt(req)
+
+    def _run():
+        result = subprocess.run(
+            [DVCODE_BIN, "-p", WECHAT_SYSTEM_PROMPT + "\n\n" + prompt,
+             "--output-format", "json"],
+            capture_output=True, text=True, timeout=300,
+        )
+        raw = (result.stdout or "").strip()
+        if result.returncode == 0 and raw:
+            try:
+                data = json.loads(raw)
+                if isinstance(data, dict) and "content" in data:
+                    return data["content"]
+            except json.JSONDecodeError:
+                pass
+            return raw
+        raise RuntimeError(f"dvcode 失败: {result.stderr.strip()[:200]}")
+
+    try:
+        html_content = await run_in_thread(_run)
+
+        # 提取 HTML — 优先找完整 DOCTYPE，其次找 <html>，再找 <body> 内容
+        import re as _re
+        for pattern in [
+            r'(<!DOCTYPE[^>]*>.*?</html>)',
+            r'(<html[\s\S]*?</html>)',
+            r'(<body[\s\S]*?</body>)',
+        ]:
+            m = _re.search(pattern, html_content, _re.IGNORECASE | _re.DOTALL)
+            if m:
+                html_content = m.group(1)
+                break
+        else:
+            # 如果完全没有 HTML 标签，说明模型输出了文字，把它包成 HTML
+            if not html_content.strip().startswith("<"):
+                html_content = (
+                    "<!DOCTYPE html><html><head><meta charset='UTF-8'></head><body>"
+                    + html_content
+                    + "</body></html>"
+                )
+
+        # 保存 HTML 文件
+        safe_title = req.topic_title[:30].replace("/", "-").replace("\\", "-").replace(" ", "_")
+        filename = f"{safe_title}-wechat.html"
+        out_path = _HERE / "output" / filename
+        out_path.parent.mkdir(exist_ok=True)
+        out_path.write_text(html_content, encoding="utf-8")
+
+        return JSONResponse({
+            "ok": True,
+            "html": html_content,
+            "filename": filename,
+            "download_url": f"/output/{filename}",
+            "model": "claude-sonnet (dvcode)",
+        })
+    except subprocess.TimeoutExpired:
+        return JSONResponse({"ok": False, "error": "生成超时，请重试"}, status_code=504)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@app.get("/output/{filename}")
+async def download_output(filename: str):
+    """下载生成的 HTML 文件"""
+    from fastapi.responses import FileResponse as _FileResponse
+    out_path = _HERE / "output" / filename
+    if not out_path.exists():
+        return JSONResponse({"ok": False, "error": "文件不存在"}, status_code=404)
+    return _FileResponse(out_path, media_type="text/html", filename=filename)
 
 
 @app.post("/api/cache/clear")
