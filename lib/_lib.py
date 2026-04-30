@@ -25,7 +25,7 @@ TIMEOUT = 10
 
 # ── MiniMax ───────────────────────────────────────────────────────────────────
 MINIMAX_API_KEY = os.environ.get("MINIMAX_API_KEY", "")
-MINIMAX_MODEL   = "MiniMax-M2.7"
+MINIMAX_MODEL   = "MiniMax-M2.5-highspeed"
 MINIMAX_URL     = "https://api.minimax.chat/v1/text/chatcompletion_v2"
 
 def call_minimax(prompt: str, system: str = None, max_tokens: int = 4096) -> str:
