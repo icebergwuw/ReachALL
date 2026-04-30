@@ -336,11 +336,10 @@ async def run_in_thread(fn):
     return await loop.run_in_executor(executor, fn)
 
 
-# ── LLM: Gemini CLI (via DeepV local auth) ───────────────────────────────────
-import subprocess, re, shutil
+# ── LLM: dvcode (DeepV Code CLI — Claude Sonnet) ─────────────────────────────
+import subprocess, shutil
 
-GEMINI_BIN = shutil.which("gemini") or "/usr/local/bin/gemini"
-GEMINI_MODEL = "gemini-2.5-flash"
+DVCODE_BIN = shutil.which("dvcode") or "/usr/local/bin/dvcode"
 
 PLATFORM_GUIDES = {
     "weibo":    {"name": "微博",   "max_len": 140, "style": "简洁有力，结尾加2-3个话题标签 #话题#"},
@@ -368,34 +367,17 @@ EasyClaw 是猎豹移动出品的桌面 AI Agent 工具，基于 OpenClaw 框架
 你的任务：根据当前热点话题，为指定平台创作一条高质量推广内容，将 EasyClaw 的价值自然融入热点。
 要求：真实、自然、不硬广，符合各平台的内容生态。只输出正文内容，不要加任何前缀或解释。"""
 
-# 需要过滤的 gemini-cli 噪音行前缀
-_NOISE_PREFIXES = (
-    "Ripgrep is not available",
-    "Skill conflict detected",
-    "Attempt ",
-    "Error when talking",
-    "ModelNotFoundError",
-)
-
-def call_gemini(prompt: str) -> str:
-    """通过 gemini CLI subprocess 调用本地 DeepV 算力"""
+def call_dvcode(prompt: str) -> str:
+    """通过 dvcode CLI 调用 DeepV Code (Claude Sonnet) 算力"""
     full_prompt = SYSTEM_PROMPT + "\n\n" + prompt
     result = subprocess.run(
-        [GEMINI_BIN, "-p", full_prompt, "--model", GEMINI_MODEL, "--skip-trust"],
-        capture_output=True, text=True, timeout=60,
-        env={**__import__("os").environ, "NO_COLOR": "1"},
+        [DVCODE_BIN, "-p", full_prompt],
+        capture_output=True, text=True, timeout=120,
     )
-    output = result.stdout or result.stderr or ""
-    # 过滤 gemini-cli 的日志噪音行，只保留实际内容
-    lines = [
-        line for line in output.splitlines()
-        if not any(line.startswith(p) for p in _NOISE_PREFIXES)
-        and line.strip()
-    ]
-    text = "\n".join(lines).strip()
-    if not text:
-        raise RuntimeError(f"gemini returned empty output. stderr: {result.stderr[:200]}")
-    return text
+    text = (result.stdout or "").strip()
+    if result.returncode == 0 and text:
+        return text
+    raise RuntimeError(f"dvcode 调用失败 (exit {result.returncode}): {result.stderr.strip()[:200]}")
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -485,8 +467,8 @@ async def generate_post(req: GenerateRequest):
 请为 EasyClaw 创作一条紧扣热点、自然植入的{plat_guide['name']}推广内容。"""
 
     try:
-        text = await run_in_thread(lambda: call_gemini(prompt))
-        return JSONResponse({"ok": True, "text": text, "model": GEMINI_MODEL})
+        text = await run_in_thread(lambda: call_dvcode(prompt))
+        return JSONResponse({"ok": True, "text": text, "model": "claude-sonnet (dvcode)"})
     except subprocess.TimeoutExpired:
         return JSONResponse({"ok": False, "error": "生成超时，请重试"}, status_code=504)
     except Exception as e:
