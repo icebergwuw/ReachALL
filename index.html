@@ -351,6 +351,7 @@
     }
 
     .trend-card::before {
+      z-index: 0;
       content: '';
       position: absolute;
       left: 0; top: 0; bottom: 0;
@@ -441,12 +442,16 @@
     .trend-change.down { color: var(--accent2); }
 
     .trend-actions {
+      position: relative;
+      z-index: 3;
       display: flex;
       gap: 8px;
       flex-shrink: 0;
     }
 
     .action-btn {
+      position: relative;
+      z-index: 2;
       display: flex;
       align-items: center;
       gap: 5px;
@@ -460,6 +465,7 @@
       font-family: 'Noto Sans SC', sans-serif;
       transition: all 0.15s;
       white-space: nowrap;
+      text-decoration: none;
     }
 
     .action-btn:hover { background: var(--surface2); color: var(--text); }
@@ -1129,6 +1135,7 @@ async function checkServer() {
 // ── LOAD & RENDER ──
 
 async function loadTrends() {
+  console.log('[loadTrends] called, serverOnline will be checked...');
   const btn = document.getElementById('refresh-btn');
   btn.classList.add('spinning');
 
@@ -1209,6 +1216,7 @@ const maxHeat = () => Math.max(...filteredTrends.map(t => t.heat), 1);
 
 function renderTrends() {
   const list = document.getElementById('trends-list');
+  console.log('[renderTrends] called, items:', filteredTrends.length);
   if (!filteredTrends.length) {
     list.innerHTML = '<div class="empty-state"><div class="empty-icon">○</div><div>暂无数据</div></div>';
     return;
@@ -1224,7 +1232,7 @@ function renderTrends() {
     const changeClass = t.change.dir === 'up' ? 'trend-change up' : t.change.dir === 'down' ? 'trend-change down' : 'trend-change';
 
     return `
-      <div class="trend-card" onclick="">
+      <div class="trend-card">
         <div class="${rankClass}">${String(t.displayRank).padStart(2,'0')}</div>
         <div class="trend-body">
           <div class="trend-title">${t.title}</div>
@@ -1238,13 +1246,13 @@ function renderTrends() {
           </div>
         </div>
         <div class="trend-actions">
-          <button class="action-btn" onclick="window.open('${t.url}','_blank')">
+          <a class="action-btn" href="${t.url || '#'}" target="_blank" rel="noopener noreferrer">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
               <path d="M7 3H3a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V9"/>
               <polyline points="10,2 14,2 14,6"/><line x1="14" y1="2" x2="7" y2="9"/>
             </svg>
             查看
-          </button>
+          </a>
           <button class="action-btn primary" onclick="openGenModal('${t.id}')">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
               <polygon points="3,2 13,8 3,14"/>
@@ -1509,7 +1517,6 @@ function showToast(msg) {
 document.addEventListener('DOMContentLoaded', () => {
   updateStats();
   loadTrends();
-  // Auto-refresh every 5 minutes
   setInterval(loadTrends, 5 * 60 * 1000);
 });
 

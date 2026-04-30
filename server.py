@@ -24,7 +24,8 @@ from urllib.parse import quote
 try:
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import JSONResponse
+    from fastapi.responses import JSONResponse, FileResponse
+    from fastapi.staticfiles import StaticFiles
     from pydantic import BaseModel
 except ImportError:
     print("FastAPI not found. Run: python -m pip install fastapi uvicorn", file=sys.stderr)
@@ -316,6 +317,8 @@ def fetch_xhs() -> list[dict]:
 
 
 # ── App ───────────────────────────────────────────────────────────────────────
+_HERE = Path(__file__).parent
+
 app = FastAPI(title="ReachALL API", version="0.1.0")
 
 app.add_middleware(
@@ -333,10 +336,11 @@ async def run_in_thread(fn):
     return await loop.run_in_executor(executor, fn)
 
 
-# ── LLM: MiniMax ──────────────────────────────────────────────────────────────
-MINIMAX_KEY = "sk-cp-UeAsUVnn0oFByLJjHCI3bUFLU4_t69n3nqvRshLiY1BePgzxNVUI2ThqZmgfSzha1SMVnWJjwP91SJ1Cnbtbtse5mq3BZPGnm2LQGlrR_5DWT7zpuLoLsKA"
-MINIMAX_URL = "https://api.minimaxi.com/v1/chat/completions"
-MINIMAX_MODEL = "MiniMax-M2.7"
+# ── LLM: Gemini CLI (via DeepV local auth) ───────────────────────────────────
+import subprocess, re, shutil
+
+GEMINI_BIN = shutil.which("gemini") or "/usr/local/bin/gemini"
+GEMINI_MODEL = "gemini-2.5-flash"
 
 PLATFORM_GUIDES = {
     "weibo":    {"name": "微博",   "max_len": 140, "style": "简洁有力，结尾加2-3个话题标签 #话题#"},
@@ -364,33 +368,34 @@ EasyClaw 是猎豹移动出品的桌面 AI Agent 工具，基于 OpenClaw 框架
 你的任务：根据当前热点话题，为指定平台创作一条高质量推广内容，将 EasyClaw 的价值自然融入热点。
 要求：真实、自然、不硬广，符合各平台的内容生态。只输出正文内容，不要加任何前缀或解释。"""
 
+# 需要过滤的 gemini-cli 噪音行前缀
+_NOISE_PREFIXES = (
+    "Ripgrep is not available",
+    "Skill conflict detected",
+    "Attempt ",
+    "Error when talking",
+    "ModelNotFoundError",
+)
 
-def call_minimax(prompt: str, max_tokens: int = 600) -> str:
-    """调用 MiniMax API 生成文本"""
-    payload = json.dumps({
-        "model": MINIMAX_MODEL,
-        "max_tokens": max_tokens,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ]
-    }, ensure_ascii=False).encode("utf-8")
-
-    req = urllib.request.Request(
-        MINIMAX_URL,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {MINIMAX_KEY}",
-        }
+def call_gemini(prompt: str) -> str:
+    """通过 gemini CLI subprocess 调用本地 DeepV 算力"""
+    full_prompt = SYSTEM_PROMPT + "\n\n" + prompt
+    result = subprocess.run(
+        [GEMINI_BIN, "-p", full_prompt, "--model", GEMINI_MODEL, "--skip-trust"],
+        capture_output=True, text=True, timeout=60,
+        env={**__import__("os").environ, "NO_COLOR": "1"},
     )
-    with urllib.request.urlopen(req, timeout=30) as r:
-        data = json.loads(r.read().decode("utf-8"))
-        text = data["choices"][0]["message"]["content"].strip()
-        # 过滤 <think>...</think> 推理过程（DeepSeek/MiniMax-M2.7 会输出）
-        import re
-        text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
-        return text
+    output = result.stdout or result.stderr or ""
+    # 过滤 gemini-cli 的日志噪音行，只保留实际内容
+    lines = [
+        line for line in output.splitlines()
+        if not any(line.startswith(p) for p in _NOISE_PREFIXES)
+        and line.strip()
+    ]
+    text = "\n".join(lines).strip()
+    if not text:
+        raise RuntimeError(f"gemini returned empty output. stderr: {result.stderr[:200]}")
+    return text
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -480,11 +485,10 @@ async def generate_post(req: GenerateRequest):
 请为 EasyClaw 创作一条紧扣热点、自然植入的{plat_guide['name']}推广内容。"""
 
     try:
-        text = await run_in_thread(lambda: call_minimax(prompt))
-        return JSONResponse({"ok": True, "text": text, "model": MINIMAX_MODEL})
-    except urllib.error.HTTPError as e:
-        body = e.read().decode("utf-8", errors="replace")[:200]
-        return JSONResponse({"ok": False, "error": f"MiniMax API error {e.code}: {body}"}, status_code=502)
+        text = await run_in_thread(lambda: call_gemini(prompt))
+        return JSONResponse({"ok": True, "text": text, "model": GEMINI_MODEL})
+    except subprocess.TimeoutExpired:
+        return JSONResponse({"ok": False, "error": "生成超时，请重试"}, status_code=504)
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
@@ -507,6 +511,21 @@ async def health():
         "agent_reach": HAS_AGENT_REACH,
     }
     return JSONResponse({"ok": True, "cache": sources, "ts": int(time.time())})
+
+
+# ── Frontend static serve ─────────────────────────────────────────────────────
+@app.get("/")
+async def serve_index():
+    """直接从后端 serve 前端页面，禁用缓存确保每次拿最新文件"""
+    from fastapi.responses import HTMLResponse
+    content = (_HERE / "index.html").read_text(encoding="utf-8")
+    return HTMLResponse(
+        content=content,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            "Pragma": "no-cache",
+        }
+    )
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
