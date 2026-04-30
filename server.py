@@ -367,6 +367,41 @@ EasyClaw 是猎豹移动出品的桌面 AI Agent 工具，基于 OpenClaw 框架
 你的任务：根据当前热点话题，为指定平台创作一条高质量推广内容，将 EasyClaw 的价值自然融入热点。
 要求：真实、自然、不硬广，符合各平台的内容生态。只输出正文内容，不要加任何前缀或解释。"""
 
+# ── LLM: MiniMax API ─────────────────────────────────────────────────────────
+MINIMAX_API_KEY = "sk-cp-6KWwIruCR98Euzmci7whjzcCmcVHP8gW0EXrqdw0qvk1Onz2-EIoflvD0a4oeQJ6ZZ7TcvVWs0jxKlLztKB-RHevISUk1c7RIT-2z6k2wH9takU-MXpKmIQ"
+MINIMAX_MODEL   = "MiniMax-M2.7"
+MINIMAX_URL     = "https://api.minimax.chat/v1/text/chatcompletion_v2"
+
+def call_minimax(prompt: str, system: str = None, max_tokens: int = 4096) -> str:
+    """直接 HTTP 调用 MiniMax API，无进程启动开销"""
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    payload = json.dumps({
+        "model": MINIMAX_MODEL,
+        "messages": messages,
+        "max_tokens": max_tokens,
+    }).encode()
+
+    req = urllib.request.Request(MINIMAX_URL, data=payload, headers={
+        "Authorization": "Bearer " + MINIMAX_API_KEY,
+        "Content-Type": "application/json",
+    })
+    with urllib.request.urlopen(req, timeout=120) as r:
+        data = json.loads(r.read().decode())
+
+    base = data.get("base_resp", {})
+    if base.get("status_code", 0) != 0:
+        raise RuntimeError(f"MiniMax error {base.get('status_code')}: {base.get('status_msg')}")
+
+    choices = data.get("choices") or []
+    if not choices:
+        raise RuntimeError("MiniMax returned no choices")
+    return choices[0].get("message", {}).get("content", "").strip()
+
+
 def call_dvcode(prompt: str, system: str = None) -> str:
     """通过 dvcode CLI 调用 DeepV Code (Claude Sonnet) 算力
     使用 --output-format json 跳过流式渲染，速度快 10x+
@@ -476,12 +511,15 @@ async def generate_post(req: GenerateRequest):
 请为 EasyClaw 创作一条紧扣热点、自然植入的{plat_guide['name']}推广内容。"""
 
     try:
-        text = await run_in_thread(lambda: call_dvcode(prompt))
-        return JSONResponse({"ok": True, "text": text, "model": "claude-sonnet (dvcode)"})
-    except subprocess.TimeoutExpired:
-        return JSONResponse({"ok": False, "error": "生成超时，请重试"}, status_code=504)
+        text = await run_in_thread(lambda: call_minimax(prompt, system=SYSTEM_PROMPT))
+        return JSONResponse({"ok": True, "text": text, "model": MINIMAX_MODEL})
     except Exception as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+        # fallback to dvcode
+        try:
+            text = await run_in_thread(lambda: call_dvcode(prompt))
+            return JSONResponse({"ok": True, "text": text, "model": "claude-sonnet (dvcode)"})
+        except Exception as e2:
+            return JSONResponse({"ok": False, "error": str(e2)}, status_code=500)
 
 
 # ── 公众号推文生成 ─────────────────────────────────────────────────────────────
@@ -549,6 +587,12 @@ async def generate_wechat_article(req: WechatArticleRequest):
     prompt = _build_wechat_prompt(req)
 
     def _run():
+        # 优先 MiniMax（无进程开销，更快）
+        try:
+            return call_minimax(prompt, system=WECHAT_SYSTEM_PROMPT, max_tokens=8192)
+        except Exception as e:
+            print(f"[wechat] MiniMax failed: {e}, fallback to dvcode", file=sys.stderr)
+        # fallback: dvcode
         result = subprocess.run(
             [DVCODE_BIN, "-p", WECHAT_SYSTEM_PROMPT + "\n\n" + prompt,
              "--output-format", "json"],
