@@ -1,2 +1,1 @@
-# No extra dependencies — all stdlib (json, urllib, http.server)
-# MiniMax API called via urllib.request
+httpx

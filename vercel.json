@@ -2,7 +2,11 @@
   "version": 2,
   "builds": [
     { "src": "index.html", "use": "@vercel/static" },
-    { "src": "api/**/*.py", "use": "@vercel/python" }
+    {
+      "src": "api/**/*.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.11" }
+    }
   ],
   "routes": [
     { "src": "/api/trends",          "dest": "/api/trends.py" },
