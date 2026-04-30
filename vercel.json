@@ -3,7 +3,22 @@
   "builds": [
     { "src": "index.html", "use": "@vercel/static" },
     {
-      "src": "api/**/*.py",
+      "src": "api/generate.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.11", "maxDuration": 60 }
+    },
+    {
+      "src": "api/generate/wechat.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.11", "maxDuration": 60 }
+    },
+    {
+      "src": "api/trends.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.11", "maxDuration": 30 }
+    },
+    {
+      "src": "api/health.py",
       "use": "@vercel/python",
       "config": { "runtime": "python3.11" }
     }
@@ -14,10 +29,5 @@
     { "src": "/api/generate",        "dest": "/api/generate.py" },
     { "src": "/api/health",          "dest": "/api/health.py" },
     { "src": "/(.*)",                "dest": "/index.html" }
-  ],
-  "functions": {
-    "api/generate.py":         { "maxDuration": 60 },
-    "api/generate/wechat.py":  { "maxDuration": 60 },
-    "api/trends.py":           { "maxDuration": 30 }
-  }
+  ]
 }
