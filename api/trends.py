@@ -4,6 +4,7 @@ GET /api/trends?platform=all|weibo|bilibili|douyin|v2ex
 import json, sys, os, time
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 from _lib import fetch_weibo, fetch_bilibili, fetch_douyin, fetch_v2ex
@@ -25,13 +26,16 @@ class handler(BaseHTTPRequestHandler):
         items, sources = [], {}
 
         if platform == "all":
-            for name, fn in fetchers.items():
-                try:
-                    res = fn()
-                    sources[name] = len(res)
-                    items.extend(res)
-                except Exception as e:
-                    print(f"[trends] {name}: {e}")
+            with ThreadPoolExecutor(max_workers=len(fetchers)) as pool:
+                future_to_name = {pool.submit(fn): name for name, fn in fetchers.items()}
+                for future in as_completed(future_to_name):
+                    name = future_to_name[future]
+                    try:
+                        res = future.result()
+                        sources[name] = len(res)
+                        items.extend(res)
+                    except Exception as e:
+                        print(f"[trends] {name}: {e}")
         elif platform in fetchers:
             try:
                 items = fetchers[platform]()

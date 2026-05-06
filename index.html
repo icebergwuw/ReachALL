@@ -1145,6 +1145,7 @@ async function loadTrends() {
 
   let items = [];
   let sources = {};
+  let updatedAt = Date.now() / 1000;
 
   if (serverOnline) {
     try {
@@ -1153,6 +1154,7 @@ async function loadTrends() {
       if (data.ok) {
         items = data.items || [];
         sources = data.sources || {};
+        updatedAt = data.updated_at || updatedAt;
       }
     } catch(e) {
       console.warn('API fetch failed:', e);
@@ -1181,7 +1183,7 @@ async function loadTrends() {
   document.getElementById('stat-dy-peak').textContent = formatHeat(maxDyHeat) || '—';
   document.getElementById('total-badge').textContent = allTrends.length || '—';
   document.getElementById('last-update').textContent =
-    '更新于 ' + new Date((data.updated_at || Date.now() / 1000) * 1000)
+    '更新于 ' + new Date(updatedAt * 1000)
       .toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
 
   btn.classList.remove('spinning');
@@ -1238,7 +1240,7 @@ function renderTrends() {
       <div class="trend-card">
         <div class="${rankClass}">${String(t.displayRank).padStart(2,'0')}</div>
         <div class="trend-body">
-          <div class="trend-title">${t.title}</div>
+          <div class="trend-title">${escapeHtml(t.title)}</div>
           <div class="trend-meta-row">
             <span class="platform-tag ${platClass}">${platTag}</span>
             <div class="heat-bar">

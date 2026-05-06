@@ -11,6 +11,7 @@ ReachALL 后端代理服务
 import asyncio
 import http.cookiejar
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -368,8 +369,8 @@ EasyClaw 是猎豹移动出品的桌面 AI Agent 工具，基于 OpenClaw 框架
 要求：真实、自然、不硬广，符合各平台的内容生态。只输出正文内容，不要加任何前缀或解释。"""
 
 # ── LLM: MiniMax API ─────────────────────────────────────────────────────────
-MINIMAX_API_KEY = "sk-cp-6KWwIruCR98Euzmci7whjzcCmcVHP8gW0EXrqdw0qvk1Onz2-EIoflvD0a4oeQJ6ZZ7TcvVWs0jxKlLztKB-RHevISUk1c7RIT-2z6k2wH9takU-MXpKmIQ"
-MINIMAX_MODEL   = "MiniMax-M2.7"
+MINIMAX_API_KEY = os.environ.get("MINIMAX_API_KEY", "")
+MINIMAX_MODEL   = "MiniMax-M2.5-highspeed"
 MINIMAX_URL     = "https://api.minimax.chat/v1/text/chatcompletion_v2"
 
 def call_minimax(prompt: str, system: str = None, max_tokens: int = 4096) -> str:
