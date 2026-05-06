@@ -12,7 +12,7 @@ import json, sys, os, re
 from http.server import BaseHTTPRequestHandler
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
-from _lib import call_minimax
+from _lib import call_deepseek, DEEPSEEK_MODEL
 
 # ── Step 1：傅盛风格写文章 ────────────────────────────────────────────────────
 WRITE_SYSTEM = """你是 EasyClaw 品牌微信公众号主笔，用傅盛写作风格创作推文。
@@ -47,7 +47,7 @@ def _write_article(topic_title, topic_heat, topic_platform, extra):
         + "\n用傅盛风格，基于这个热点写一篇 EasyClaw 公众号推文正文。"
         "开门见山，有故事，有态度，结尾有 CTA。直接输出正文，不加任何说明。"
     )
-    return call_minimax(prompt, system=WRITE_SYSTEM, max_tokens=2000)
+    return call_deepseek(prompt, system=WRITE_SYSTEM, max_tokens=2000)
 
 
 # ── Step 2：转成星辰排版 HTML ─────────────────────────────────────────────────
@@ -98,7 +98,7 @@ def _layout_html(article_text, topic_title):
         "将以上文章转成完整的微信公众号排版 HTML。"
         "直接输出 HTML，从 <!DOCTYPE html> 开始。"
     )
-    return call_minimax(prompt, system=LAYOUT_SYSTEM, max_tokens=4000)
+    return call_deepseek(prompt, system=LAYOUT_SYSTEM, max_tokens=4000)
 
 
 # ── HTML 提取 ─────────────────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ class handler(BaseHTTPRequestHandler):
 
             safe = topic_title[:30].replace("/", "-").replace("\\", "-").replace(" ", "_")
             filename = f"{safe}-wechat.html"
-            self._json({"ok": True, "html": html, "filename": filename})
+            self._json({"ok": True, "html": html, "filename": filename, "model": DEEPSEEK_MODEL})
         except Exception as e:
             self._json({"ok": False, "error": str(e)}, 500)
 

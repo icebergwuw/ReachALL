@@ -23,10 +23,53 @@ _UA_MOBILE = (
 )
 TIMEOUT = 10
 
-# ── MiniMax ───────────────────────────────────────────────────────────────────
+# ── LLM providers ─────────────────────────────────────────────────────────────
 MINIMAX_API_KEY = os.environ.get("MINIMAX_API_KEY", "")
 MINIMAX_MODEL   = "MiniMax-M2.5-highspeed"
 MINIMAX_URL     = "https://api.minimax.chat/v1/text/chatcompletion_v2"
+
+DEEPSEEK_API_KEY  = os.environ.get("DEEPSEEK_API_KEY", "")
+DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+DEEPSEEK_MODEL    = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
+DEEPSEEK_URL      = DEEPSEEK_BASE_URL.rstrip("/") + "/chat/completions"
+
+
+def call_deepseek(prompt: str, system: str = None, max_tokens: int = 4096) -> str:
+    if not DEEPSEEK_API_KEY:
+        raise RuntimeError("DEEPSEEK_API_KEY is not configured")
+
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
+
+    payload = json.dumps({
+        "model": DEEPSEEK_MODEL,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": 0.7,
+    }).encode()
+
+    req = urllib.request.Request(DEEPSEEK_URL, data=payload, headers={
+        "Authorization": "Bearer " + DEEPSEEK_API_KEY,
+        "Content-Type": "application/json",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            data = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"DeepSeek HTTP {e.code}: {detail}") from e
+
+    error = data.get("error")
+    if error:
+        raise RuntimeError(f"DeepSeek error: {error}")
+
+    choices = data.get("choices") or []
+    if not choices:
+        raise RuntimeError("DeepSeek returned no choices")
+    return choices[0].get("message", {}).get("content", "").strip()
+
 
 def call_minimax(prompt: str, system: str = None, max_tokens: int = 4096) -> str:
     messages = []

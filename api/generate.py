@@ -6,7 +6,7 @@ import json, sys, os
 from http.server import BaseHTTPRequestHandler
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-from _lib import call_minimax, SYSTEM_PROMPT, PLATFORM_GUIDES, TONE_GUIDES
+from _lib import call_deepseek, DEEPSEEK_MODEL, SYSTEM_PROMPT, PLATFORM_GUIDES, TONE_GUIDES
 
 
 class handler(BaseHTTPRequestHandler):
@@ -36,8 +36,8 @@ class handler(BaseHTTPRequestHandler):
         )
 
         try:
-            text = call_minimax(prompt, system=SYSTEM_PROMPT)
-            self._json({"ok": True, "text": text, "model": "MiniMax-M2.7"})
+            text = call_deepseek(prompt, system=SYSTEM_PROMPT)
+            self._json({"ok": True, "text": text, "model": DEEPSEEK_MODEL})
         except Exception as e:
             self._json({"ok": False, "error": str(e)}, 500)
 
