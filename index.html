@@ -1798,6 +1798,13 @@ async function handleResearch() {
     output.textContent = researchReport;
     copyBtn.style.display = 'inline-flex';
     showToast('需求挖掘完成');
+
+    // 异步追加深度搜索证据
+    const seedEl = document.getElementById('research-seed');
+    const deepSeed = seedEl ? seedEl.value.trim() : seed;
+    if (deepSeed) {
+      appendDeepSignals(deepSeed, 'research-output', 'research-placeholder');
+    }
   } catch (e) {
     output.textContent = '生成失败：' + e.message;
     showToast('需求挖掘失败');
@@ -1810,6 +1817,44 @@ async function handleResearch() {
 function copyResearchReport() {
   if (!researchReport) return;
   navigator.clipboard.writeText(researchReport).then(() => showToast('报告已复制 ✓'));
+}
+
+async function appendDeepSignals(seed, outputId, placeholderId) {
+  try {
+    const res = await fetch(`${API_BASE}/api/search/deep`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seed }),
+      signal: AbortSignal.timeout(30000)
+    });
+    const data = await res.json();
+    if (!data.ok) return;
+    const signals = data.signals || {};
+    const parts = ['\n\n---\n## 深度搜索证据\n'];
+    for (const [source, items] of Object.entries(signals)) {
+      if (!items || !items.length) continue;
+      parts.push(`\n### ${source}\n`);
+      for (const item of items.slice(0, 5)) {
+        parts.push(`- **${escapeHtml(item.title)}**`);
+        parts.push(`  ${escapeHtml(item.url)}`);
+        const bodyText = item.body || item.selftext || item.description || '';
+        if (bodyText) parts.push(`  内容摘要: ${escapeHtml(bodyText.slice(0, 200))}`);
+        if (item.comments && Array.isArray(item.comments)) {
+          for (const c of item.comments.slice(0, 3)) {
+            parts.push(`  评论: ${escapeHtml(c.slice(0, 200))}`);
+          }
+        }
+        parts.push('');
+      }
+    }
+    if (parts.length > 2) {
+      researchReport += parts.join('\n');
+      const output = document.getElementById(outputId);
+      if (output) output.textContent = researchReport;
+    }
+  } catch (e) {
+    console.warn('[deep signals]', e);
+  }
 }
 
 // ── LIBRARY ──
