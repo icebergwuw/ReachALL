@@ -545,3 +545,71 @@ def build_research_report(seed: str, product: str, goal: str, signals: dict) -> 
 给出 5 个低成本验证动作，例如写文章、发帖、做对比页、搜索更多评论等。
 """
     return call_deepseek(prompt, system=system, max_tokens=5000)
+
+
+def _parse_json_object(text: str) -> dict:
+    text = (text or "").strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.lower().startswith("json"):
+            text = text[4:].strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        text = text[start:end + 1]
+    return json.loads(text)
+
+
+def discover_seed_keywords(product: str = "EasyClaw", market: str = "AI Agent / Web Automation", competitors: list[str] = None) -> list[dict]:
+    competitors = competitors or ["n8n", "Zapier", "Dify", "Browser Use", "OpenAI Operator", "Manus", "Skyvern", "Playwright", "Puppeteer"]
+    signals = collect_research_signals(market)
+    system = """你是SEO种子词发现Agent。你的任务不是写报告，而是从产品定位、竞品、社区趋势和用户痛点中发现可用于SEO/内容/增长实验的高价值种子关键词。只输出JSON，不要输出解释。"""
+    prompt = f"""请为以下产品自动发现SEO/需求挖掘种子词。
+
+目标产品：{product}
+目标市场：{market}
+竞品/参考对象：{', '.join(competitors)}
+
+多渠道信号：
+{_signal_lines(signals)}
+
+请输出严格JSON，格式如下：
+{{
+  "seeds": [
+    {{
+      "keyword": "n8n alternative",
+      "type": "competitor|pain|scenario|trend|capability",
+      "score": 94,
+      "sources": ["reddit", "github"],
+      "reason": "为什么这是高价值种子词",
+      "next_action": "建议下一步动作"
+    }}
+  ]
+}}
+
+要求：
+- 输出20个种子词
+- keyword必须是用户可能真实搜索的英文SEO短语
+- type只能是 competitor/pain/scenario/trend/capability 之一
+- score是0-100的整数
+- 优先选择和本地AI Agent、浏览器自动化、工作流自动化、竞品替代、隐私/价格/部署痛点相关的词
+- 不要输出泛泛的AI新闻词
+"""
+    data = _parse_json_object(call_deepseek(prompt, system=system, max_tokens=4000))
+    seeds = data.get("seeds", []) if isinstance(data, dict) else []
+    normalized = []
+    for item in seeds[:30]:
+        if not isinstance(item, dict):
+            continue
+        keyword = str(item.get("keyword", "")).strip()
+        if not keyword:
+            continue
+        normalized.append({
+            "keyword": keyword,
+            "type": item.get("type", "trend"),
+            "score": int(item.get("score", 0) or 0),
+            "sources": item.get("sources", []),
+            "reason": item.get("reason", ""),
+            "next_action": item.get("next_action", ""),
+        })
+    return sorted(normalized, key=lambda x: x.get("score", 0), reverse=True)

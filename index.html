@@ -858,6 +858,63 @@
       transform: translateX(-50%) translateY(0);
     }
 
+    .seed-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .seed-card {
+      border: 1px solid var(--border-bright);
+      background: rgba(250,249,245,0.86);
+      border-radius: 14px;
+      padding: 13px 14px;
+      cursor: pointer;
+      transition: all 0.16s ease;
+    }
+
+    .seed-card:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--whisper);
+      border-color: var(--accent);
+    }
+
+    .seed-card-title {
+      font-family: 'Noto Serif SC', Georgia, serif;
+      font-size: 16px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 7px;
+    }
+
+    .seed-card-meta {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 7px;
+    }
+
+    .seed-chip {
+      font-size: 10px;
+      color: var(--accent);
+      background: rgba(201,100,66,0.10);
+      border-radius: 999px;
+      padding: 2px 7px;
+    }
+
+    .seed-score {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--text-mid);
+    }
+
+    .seed-reason {
+      font-size: 12px;
+      color: var(--text-mid);
+      line-height: 1.55;
+    }
+
     /* ── SCROLLBAR ── */
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -1040,12 +1097,27 @@
       </div>
       <div class="gen-form" style="max-width:980px">
         <div class="form-row">
-          <label class="form-label">种子词</label>
-          <input class="form-textarea" id="research-seed" placeholder="例如：web automation / ai agent / workflow automation" style="min-height:44px;resize:none">
-        </div>
-        <div class="form-row">
           <label class="form-label">目标产品</label>
           <input class="form-textarea" id="research-product" value="EasyClaw" style="min-height:44px;resize:none">
+        </div>
+        <div class="form-row">
+          <label class="form-label">目标市场</label>
+          <input class="form-textarea" id="seed-market" value="AI Agent / Web Automation" placeholder="例如：AI Agent / Web Automation / Workflow Automation" style="min-height:44px;resize:none">
+        </div>
+        <div class="form-row">
+          <label class="form-label">竞品/参考对象</label>
+          <input class="form-textarea" id="seed-competitors" value="n8n, Zapier, Dify, Browser Use, OpenAI Operator, Manus, Skyvern" style="min-height:44px;resize:none">
+        </div>
+        <div class="gen-actions">
+          <button class="gen-btn primary" id="seed-btn" onclick="discoverSeeds()">一键发现种子词</button>
+        </div>
+        <div class="gen-output" id="seed-panel" style="min-height:170px;margin-bottom:22px">
+          <div class="gen-output-placeholder" id="seed-placeholder">不用手填种子词。Agent 会根据产品、竞品和全渠道趋势自动发现高意图关键词。</div>
+          <div class="gen-output-text" id="seed-list" style="display:none"></div>
+        </div>
+        <div class="form-row">
+          <label class="form-label">种子词（可手动输入，也可点击上方机会词）</label>
+          <input class="form-textarea" id="research-seed" placeholder="例如：web automation / n8n alternative / scrape login required pages" style="min-height:44px;resize:none">
         </div>
         <div class="form-row">
           <label class="form-label">战术目标</label>
@@ -1180,6 +1252,7 @@ let currentPlatform = 'weibo';
 let currentTone = '营销种草';
 let generatedText = '';
 let researchReport = '';
+let discoveredSeeds = [];
 let isGenerating = false;
 let serverOnline = false;
 
@@ -1628,6 +1701,69 @@ function escapeHtml(s) {
 }
 
 // ── RESEARCH AGENT ──
+async function discoverSeeds() {
+  const product = document.getElementById('research-product').value.trim() || 'EasyClaw';
+  const market = document.getElementById('seed-market').value.trim() || 'AI Agent / Web Automation';
+  const competitors = document.getElementById('seed-competitors').value.trim();
+  const btn = document.getElementById('seed-btn');
+  const placeholder = document.getElementById('seed-placeholder');
+  const list = document.getElementById('seed-list');
+
+  btn.disabled = true;
+  btn.textContent = '发现中…';
+  placeholder.style.display = 'none';
+  list.style.display = 'block';
+  list.innerHTML = '正在扫描全渠道信号并生成种子词机会榜…';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/seeds/discover`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product, market, competitors }),
+      signal: AbortSignal.timeout(65000)
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '种子词发现失败');
+    discoveredSeeds = data.seeds || [];
+    renderSeeds(discoveredSeeds);
+    showToast('种子词发现完成');
+  } catch (e) {
+    list.textContent = '发现失败：' + e.message;
+    showToast('种子词发现失败');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '一键发现种子词';
+  }
+}
+
+function renderSeeds(seeds) {
+  const list = document.getElementById('seed-list');
+  if (!seeds.length) {
+    list.innerHTML = '<div class="empty-state" style="padding:24px 0">没有发现有效种子词</div>';
+    return;
+  }
+  list.innerHTML = `<div class="seed-grid">${seeds.map((s, idx) => `
+    <div class="seed-card" onclick="useSeed(${idx})">
+      <div class="seed-card-title">${escapeHtml(s.keyword)}</div>
+      <div class="seed-card-meta">
+        <span class="seed-chip">${escapeHtml(s.type || 'trend')}</span>
+        <span class="seed-score">Score ${Number(s.score || 0)}</span>
+        <span class="seed-score">${(s.sources || []).join(' · ')}</span>
+      </div>
+      <div class="seed-reason">${escapeHtml(s.reason || '')}</div>
+    </div>
+  `).join('')}</div>`;
+}
+
+function useSeed(index) {
+  const seed = discoveredSeeds[index];
+  if (!seed) return;
+  document.getElementById('research-seed').value = seed.keyword;
+  const goal = document.getElementById('research-goal');
+  if (!goal.value.trim() && seed.next_action) goal.value = seed.next_action;
+  showToast('已填入种子词');
+}
+
 async function handleResearch() {
   const seed = document.getElementById('research-seed').value.trim();
   const product = document.getElementById('research-product').value.trim() || 'EasyClaw';

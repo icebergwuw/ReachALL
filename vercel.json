@@ -18,6 +18,11 @@
       "config": { "runtime": "python3.11", "maxDuration": 30 }
     },
     {
+      "src": "api/seeds/discover.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.11", "maxDuration": 60 }
+    },
+    {
       "src": "api/research.py",
       "use": "@vercel/python",
       "config": { "runtime": "python3.11", "maxDuration": 60 }
@@ -32,6 +37,7 @@
     { "src": "/api/trends",          "dest": "/api/trends.py" },
     { "src": "/api/generate/wechat", "dest": "/api/generate/wechat.py" },
     { "src": "/api/generate",        "dest": "/api/generate.py" },
+    { "src": "/api/seeds/discover", "dest": "/api/seeds/discover.py" },
     { "src": "/api/research",        "dest": "/api/research.py" },
     { "src": "/api/health",          "dest": "/api/health.py" },
     { "src": "/(.*)",                "dest": "/index.html" }
