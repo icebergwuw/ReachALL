@@ -300,13 +300,9 @@ def fetch_github() -> list[dict]:
 
 
 def fetch_reddit() -> list[dict]:
-    try:
-        data = _fetch_json(
-            "https://www.reddit.com/r/technology/hot.json?limit=20&raw_json=1",
-            headers={"User-Agent": "ReachALL/1.0 trend reader"},
-        )
+    def normalize_official(children: list) -> list[dict]:
         result = []
-        for i, child in enumerate(data.get("data", {}).get("children", [])[:20]):
+        for i, child in enumerate(children[:20]):
             item = child.get("data", {})
             score = item.get("score", 0)
             permalink = item.get("permalink", "")
@@ -319,8 +315,41 @@ def fetch_reddit() -> list[dict]:
                 "author": item.get("author", ""),
             })
         return result
+
+    def normalize_pullpush(posts: list) -> list[dict]:
+        result = []
+        for i, item in enumerate(posts[:20]):
+            score = item.get("score", 0)
+            permalink = item.get("permalink", "")
+            result.append({
+                "id": f"rd_{item.get('id', i)}", "platform": "reddit", "rank": i + 1,
+                "title": item.get("title", ""), "heat": score,
+                "heatLabel": f"{score} 分",
+                "category": f"r/{item.get('subreddit', '')}",
+                "url": "https://www.reddit.com" + permalink if permalink.startswith("/") else item.get("url", ""),
+                "author": item.get("author", ""),
+            })
+        return result
+
+    try:
+        data = _fetch_json(
+            "https://www.reddit.com/r/technology/hot.json?limit=20&raw_json=1",
+            headers={"User-Agent": "ReachALL/1.0 trend reader"},
+        )
+        result = normalize_official(data.get("data", {}).get("children", []))
+        if result:
+            return result
     except Exception as e:
-        print(f"[reddit] {e}")
+        print(f"[reddit official] {e}")
+
+    try:
+        data = _fetch_json(
+            "https://api.pullpush.io/reddit/search/submission/?subreddit=technology&sort_type=score&sort=desc&size=20",
+            headers={"User-Agent": "ReachALL/1.0 trend reader"},
+        )
+        return normalize_pullpush(data.get("data", []))
+    except Exception as e:
+        print(f"[reddit pullpush] {e}")
         return []
 
 
