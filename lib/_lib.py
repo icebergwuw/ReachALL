@@ -23,7 +23,7 @@ _UA_MOBILE = (
     "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
 )
-TIMEOUT = 10
+TIMEOUT = 6
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 
 # ── LLM providers ─────────────────────────────────────────────────────────────
@@ -660,7 +660,7 @@ def build_research_report(seed: str, product: str, goal: str, signals: dict) -> 
 ## 7. 下一步验证动作
 给出 5 个低成本验证动作，例如写文章、发帖、做对比页、搜索更多评论等。
 """
-    return call_deepseek(prompt, system=system, max_tokens=5000)
+    return call_deepseek(prompt, system=system, max_tokens=3000)
 
 
 def _parse_json_object(text: str) -> dict:
