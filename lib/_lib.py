@@ -301,9 +301,8 @@ def fetch_github() -> list[dict]:
 
 def fetch_reddit() -> list[dict]:
     try:
-        subs = "technology+artificial+ChatGPT+LocalLLaMA+programming+startups+Entrepreneur"
         data = _fetch_json(
-            f"https://www.reddit.com/r/{subs}/hot.json?limit=25",
+            "https://www.reddit.com/r/technology/hot.json?limit=20&raw_json=1",
             headers={"User-Agent": "ReachALL/1.0 trend reader"},
         )
         result = []
