@@ -6,7 +6,7 @@ import json, sys, os
 from http.server import BaseHTTPRequestHandler
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
-from _lib import search_github_issues, search_reddit_posts, search_youtube_videos
+from _lib import search_github_issues, search_reddit_posts, search_youtube_videos, search_twitter
 
 
 class handler(BaseHTTPRequestHandler):
@@ -49,6 +49,12 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             signals["youtube_videos"] = []
             print(f"[deep] youtube_videos: {e}")
+
+        try:
+            signals["twitter_search"] = search_twitter(seed)
+        except Exception as e:
+            signals["twitter_search"] = []
+            print(f"[deep] twitter_search: {e}")
 
         self._json({"ok": True, "seed": seed, "signals": signals})
 

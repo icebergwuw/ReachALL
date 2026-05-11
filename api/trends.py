@@ -1,5 +1,5 @@
 """
-GET /api/trends?platform=all|weibo|bilibili|douyin|v2ex|github|reddit|hackernews|producthunt|youtube|google_trends
+GET /api/trends?platform=all|weibo|bilibili|douyin|v2ex|github|reddit|hackernews|producthunt|youtube|google_trends|twitter
 """
 import json, sys, os, time
 from http.server import BaseHTTPRequestHandler
@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 from _lib import (
     fetch_weibo, fetch_bilibili, fetch_douyin, fetch_v2ex,
     fetch_github, fetch_reddit, fetch_hackernews, fetch_producthunt,
-    fetch_youtube, fetch_google_trends,
+    fetch_youtube, fetch_google_trends, fetch_twitter,
 )
 
 FETCHERS = {
@@ -24,6 +24,7 @@ FETCHERS = {
     "producthunt":   fetch_producthunt,
     "youtube":       fetch_youtube,
     "google_trends": fetch_google_trends,
+    "twitter":       fetch_twitter,
 }
 
 

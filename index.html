@@ -241,6 +241,7 @@
 .pf-btn.ph.active   { background: #da552f;        color: #fff; border-color: #da552f;       }
 .pf-btn.yt.active   { background: #ff0000;        color: #fff; border-color: #ff0000;       }
 .pf-btn.gt.active   { background: #4285f4;        color: #fff; border-color: #4285f4;       }
+.pf-btn.tw.active   { background: #14171a;        color: #fff; border-color: #14171a;       }
 
     .refresh-btn {
       display: flex;
@@ -429,6 +430,7 @@
     .tag-producthunt { background: rgba(218,85,47,0.14); color: #ff8a65; }
     .tag-youtube  { background: rgba(255,0,0,0.12); color: #ff6b6b; }
     .tag-google-trends { background: rgba(66,133,244,0.14); color: #8ab4f8; }
+.tag-twitter  { background: rgba(29,161,242,0.14); color: #1da1f2; }
 
     .heat-bar {
       display: flex;
@@ -1041,6 +1043,7 @@
         <button class="pf-btn ph" onclick="setPlatformFilter('producthunt', this)">Product Hunt</button>
         <button class="pf-btn yt" onclick="setPlatformFilter('youtube', this)">YouTube</button>
         <button class="pf-btn gt" onclick="setPlatformFilter('google_trends', this)">Google Trends</button>
+        <button class="pf-btn tw" onclick="setPlatformFilter('twitter', this)">X</button>
       </div>
       <button class="refresh-btn" id="refresh-btn" onclick="loadTrends()">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -1269,6 +1272,7 @@ const PLAT_META = {
   producthunt: { label: 'Product Hunt', tagClass: 'tag-producthunt' },
   youtube:  { label: 'YouTube', tagClass: 'tag-youtube' },
   google_trends: { label: 'Google Trends', tagClass: 'tag-google-trends' },
+  twitter:  { label: 'X', tagClass: 'tag-twitter' },
 };
 
 // ── SERVER STATUS ──
@@ -1440,7 +1444,7 @@ function setPlatformFilter(plat, btn) {
 function filterPlatform(plat) {
   currentPlatFilter = plat;
   document.querySelectorAll('.pf-btn').forEach(b => b.classList.remove('active'));
-  const map = { weibo: 1, douyin: 2, xhs: 3, bilibili: 4, v2ex: 5, github: 6, reddit: 7, hackernews: 8, producthunt: 9, youtube: 10, google_trends: 11 };
+  const map = { weibo: 1, douyin: 2, xhs: 3, bilibili: 4, v2ex: 5, github: 6, reddit: 7, hackernews: 8, producthunt: 9, youtube: 10, google_trends: 11, twitter: 12 };
   const idx = map[plat];
   if (idx !== undefined) document.querySelectorAll('.pf-btn')[idx]?.classList.add('active');
   switchView('trends', document.querySelectorAll('.nav-item')[0]);

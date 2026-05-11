@@ -461,6 +461,42 @@ def fetch_google_trends() -> list[dict]:
         return []
 
 
+def fetch_twitter() -> list[dict]:
+    """Fetch AI/Tech trending tweets using Twitter API v2."""
+    try:
+        token = os.environ.get("TWITTER_BEARER_TOKEN", "")
+        if not token:
+            return []
+        url = "https://api.twitter.com/2/tweets/search/recent?" + urlencode({
+            "query": "(AI OR OpenAI OR Claude OR automation OR agent OR workflow OR LLM OR browser OR n8n OR Zapier OR EasyClaw) -is:retweet lang:en",
+            "max_results": 20,
+            "tweet.fields": "public_metrics,created_at,author_id",
+            "sort_order": "relevancy",
+        })
+        data = _fetch_json(url, headers={
+            "User-Agent": "ReachALL/1.0",
+            "Authorization": f"Bearer {token}",
+        })
+        result = []
+        for i, tweet in enumerate(data.get("data", [])[:20]):
+            metrics = tweet.get("public_metrics", {})
+            likes = metrics.get("like_count", 0)
+            retweets = metrics.get("retweet_count", 0)
+            result.append({
+                "id": f"tw_{tweet.get('id', i)}", "platform": "twitter", "rank": i + 1,
+                "title": tweet.get("text", "")[:280],
+                "heat": likes + retweets * 5,
+                "heatLabel": f"{likes}❤️ {retweets}🔁",
+                "category": "Tweet",
+                "url": f"https://twitter.com/i/web/status/{tweet.get('id', '')}",
+            })
+        return result
+    except Exception as e:
+        print(f"[twitter] {e}")
+        return []
+
+
+
 # ── Deep Search Functions ─────────────────────────────────────────────────────
 def search_github_issues(seed: str) -> list[dict]:
     """Search GitHub Issues for real user complaints, feature requests, bugs."""
@@ -577,6 +613,41 @@ def search_youtube_videos(seed: str) -> list[dict]:
         return []
 
 
+def search_twitter(seed: str) -> list[dict]:
+    """Search Twitter for real user opinions and complaints bearing seed keyword."""
+    try:
+        token = os.environ.get("TWITTER_BEARER_TOKEN", "")
+        if not token:
+            return []
+        url = "https://api.twitter.com/2/tweets/search/recent?" + urlencode({
+            "query": f'"{seed}" lang:en -is:retweet',
+            "max_results": 10,
+            "tweet.fields": "public_metrics,created_at,author_id",
+            "sort_order": "relevancy",
+        })
+        data = _fetch_json(url, headers={
+            "User-Agent": "ReachALL/1.0",
+            "Authorization": f"Bearer {token}",
+        })
+        result = []
+        for i, tweet in enumerate(data.get("data", [])[:10]):
+            metrics = tweet.get("public_metrics", {})
+            likes = metrics.get("like_count", 0)
+            retweets = metrics.get("retweet_count", 0)
+            result.append({
+                "id": f"tws_{tweet.get('id', i)}", "platform": "twitter_search", "rank": i + 1,
+                "title": tweet.get("text", "")[:280],
+                "body": tweet.get("text", "")[:400],
+                "heat": likes + retweets * 5,
+                "heatLabel": f"{likes}❤️ {retweets}🔁",
+                "url": f"https://twitter.com/i/web/status/{tweet.get('id', '')}",
+            })
+        return result
+    except Exception as e:
+        print(f"[twitter_search] {e}")
+        return []
+
+
 # ── SEO / Demand Research Agent ───────────────────────────────────────────────
 def collect_research_signals(seed: str) -> dict:
     """Collect cross-channel signals — trending feeds."""
@@ -588,6 +659,7 @@ def collect_research_signals(seed: str) -> dict:
         "producthunt": fetch_producthunt,
         "google_trends": fetch_google_trends,
         "hackernews": fetch_hackernews,
+        "twitter": fetch_twitter,
     }
     signals = {}
     for name, fn in sources.items():
