@@ -438,27 +438,37 @@ def fetch_youtube() -> list[dict]:
 
 
 def fetch_google_trends() -> list[dict]:
-    try:
-        xml = _fetch_text(
-            "https://trends.google.com/trending/rss?geo=US&hl=en-US",
-            headers={"User-Agent": _UA_DESKTOP},
-        )
-        root = ET.fromstring(xml)
-        result = []
-        for i, item in enumerate(root.findall("./channel/item")[:20]):
-            title = _xml_text(item, "title")
-            traffic = _xml_text(item, "{https://trends.google.com/trending/rss}approx_traffic")
-            result.append({
-                "id": f"gt_{i}", "platform": "google_trends", "rank": i + 1,
-                "title": title, "heat": 20 - i,
-                "heatLabel": traffic or "Google Trends",
-                "category": "Trending Search",
-                "url": _xml_text(item, "link") or f"https://www.google.com/search?q={quote(title)}",
-            })
-        return result
-    except Exception as e:
-        print(f"[google_trends] {e}")
-        return []
+    """Fetch Google Trends — daily/weekly hot searches for US, CN, JP, GLOBAL."""
+    # (geo, hl, label)
+    regions = [
+        ("US", "en-US", "US"),
+        ("JP", "ja-JP", "JP"),
+        ("",   "en-US", "Global"),
+    ]
+    result = []
+    for geo, hl, label in regions:
+        geo_param = f"&geo={geo}" if geo else ""
+        for hours, period in [(24, "Daily"), (168, "Weekly")]:
+            url = f"https://trends.google.com/trending/rss?hl={hl}{geo_param}&hours={hours}"
+            try:
+                xml = _fetch_text(url, headers={"User-Agent": _UA_DESKTOP})
+                root = ET.fromstring(xml)
+                for i, item in enumerate(root.findall("./channel/item")[:15]):
+                    title = _xml_text(item, "title")
+                    traffic = _xml_text(item, "{https://trends.google.com/trending/rss}approx_traffic")
+                    result.append({
+                        "id": f"gt_{geo}_{hours}_{i}",
+                        "platform": "google_trends",
+                        "rank": i + 1,
+                        "title": title,
+                        "heat": 20 - i,
+                        "heatLabel": traffic or "Trending",
+                        "category": f"{label} {period} Hot",
+                        "url": _xml_text(item, "link") or f"https://www.google.com/search?q={quote(title)}",
+                    })
+            except Exception as e:
+                print(f"[google_trends {label} {period}] {e}")
+    return result
 
 
 def fetch_twitter() -> list[dict]:
