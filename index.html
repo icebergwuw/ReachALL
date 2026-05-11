@@ -1395,6 +1395,8 @@ function renderTrends() {
     const meta = PLAT_META[t.platform] || { label: t.platform, tagClass: 'tag-weibo' };
     const platTag = meta.label;
     const platClass = meta.tagClass;
+    const categoryLabel = t.category || '';
+    const showCategory = categoryLabel && categoryLabel !== platTag;
     const rankClass = t.displayRank <= 3 ? 'trend-rank top3' : 'trend-rank';
     const changeClass = t.change.dir === 'up' ? 'trend-change up' : t.change.dir === 'down' ? 'trend-change down' : 'trend-change';
 
@@ -1405,6 +1407,7 @@ function renderTrends() {
           <div class="trend-title">${escapeHtml(t.title)}</div>
           <div class="trend-meta-row">
             <span class="platform-tag ${platClass}">${platTag}</span>
+            ${showCategory ? `<span class="platform-tag tag-category" style="background:rgba(95,111,82,0.12);color:#5f6f52;margin-left:5px">${escapeHtml(categoryLabel)}</span>` : ''}
             <div class="heat-bar">
               <span class="heat-value">${t.heatLabel}</span>
               <div class="heat-track"><div class="heat-fill" style="width:${pct}%"></div></div>
