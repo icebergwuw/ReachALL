@@ -887,6 +887,14 @@
       实时热榜
       <span class="nav-badge" id="total-badge">—</span>
     </div>
+    <div class="nav-item" onclick="switchView('research', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="7" cy="7" r="4"/>
+        <path d="M10 10l4 4"/>
+        <path d="M5 7h4M7 5v4"/>
+      </svg>
+      需求挖掘
+    </div>
     <div class="nav-item" onclick="switchView('library', this)">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
         <rect x="2" y="2" width="12" height="12" rx="2"/>
@@ -1008,6 +1016,36 @@
       </div>
     </div>
 
+    <!-- RESEARCH VIEW -->
+    <div class="view" id="view-research">
+      <div class="section-header">
+        <div class="section-title">SEO / 需求挖掘 Agent</div>
+        <div class="section-meta">GitHub · Reddit · YouTube · Product Hunt · Google Trends · HN</div>
+      </div>
+      <div class="gen-form" style="max-width:980px">
+        <div class="form-row">
+          <label class="form-label">种子词</label>
+          <input class="form-textarea" id="research-seed" placeholder="例如：web automation / ai agent / workflow automation" style="min-height:44px;resize:none">
+        </div>
+        <div class="form-row">
+          <label class="form-label">目标产品</label>
+          <input class="form-textarea" id="research-product" value="EasyClaw" style="min-height:44px;resize:none">
+        </div>
+        <div class="form-row">
+          <label class="form-label">战术目标</label>
+          <textarea class="form-textarea" id="research-goal" rows="2" placeholder="例如：抢 n8n / Zapier 用户，主打零代码、本地安全、复杂网页自动化"></textarea>
+        </div>
+        <div class="gen-actions">
+          <button class="gen-btn primary" id="research-btn" onclick="handleResearch()">开始挖掘</button>
+          <button class="gen-btn secondary" id="research-copy-btn" onclick="copyResearchReport()" style="display:none">复制报告</button>
+        </div>
+        <div class="gen-output" style="min-height:360px">
+          <div class="gen-output-placeholder" id="research-placeholder">输入种子词后，Agent 将跨 GitHub / Reddit / YouTube / Product Hunt / Google Trends / HN 汇总需求信号，并生成市场机会报告。</div>
+          <pre class="gen-output-text" id="research-output" style="display:none;white-space:pre-wrap;font-family:inherit;line-height:1.7"></pre>
+        </div>
+      </div>
+    </div>
+
     <!-- LIBRARY VIEW -->
     <div class="view" id="view-library">
       <div class="section-header">
@@ -1125,6 +1163,7 @@ let currentTopic = null;
 let currentPlatform = 'weibo';
 let currentTone = '营销种草';
 let generatedText = '';
+let researchReport = '';
 let isGenerating = false;
 let serverOnline = false;
 
@@ -1327,7 +1366,7 @@ function switchView(view, navEl) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   if (navEl) navEl.classList.add('active');
 
-  const titles = { trends: '实时热榜', library: '推文库' };
+  const titles = { trends: '实时热榜', research: '需求挖掘', library: '推文库' };
   document.getElementById('view-title').textContent = titles[view] || view;
 
   const pfFilter = document.getElementById('pf-filter');
@@ -1570,6 +1609,55 @@ function previewWechat() {
 
 function escapeHtml(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── RESEARCH AGENT ──
+async function handleResearch() {
+  const seed = document.getElementById('research-seed').value.trim();
+  const product = document.getElementById('research-product').value.trim() || 'EasyClaw';
+  const goal = document.getElementById('research-goal').value.trim() || '寻找高意图SEO关键词和内容切入点';
+  if (!seed) {
+    showToast('请输入种子词');
+    return;
+  }
+
+  const btn = document.getElementById('research-btn');
+  const placeholder = document.getElementById('research-placeholder');
+  const output = document.getElementById('research-output');
+  const copyBtn = document.getElementById('research-copy-btn');
+  btn.disabled = true;
+  btn.textContent = '挖掘中…';
+  placeholder.style.display = 'none';
+  output.style.display = 'block';
+  output.textContent = '正在跨渠道收集 GitHub / Reddit / YouTube / Product Hunt / Google Trends / HN 信号，并生成报告…';
+  copyBtn.style.display = 'none';
+  researchReport = '';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/research`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seed, product, goal }),
+      signal: AbortSignal.timeout(65000)
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || '需求挖掘失败');
+    researchReport = data.report || '';
+    output.textContent = researchReport;
+    copyBtn.style.display = 'inline-flex';
+    showToast('需求挖掘完成');
+  } catch (e) {
+    output.textContent = '生成失败：' + e.message;
+    showToast('需求挖掘失败');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '开始挖掘';
+  }
+}
+
+function copyResearchReport() {
+  if (!researchReport) return;
+  navigator.clipboard.writeText(researchReport).then(() => showToast('报告已复制 ✓'));
 }
 
 // ── LIBRARY ──

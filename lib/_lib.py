@@ -459,3 +459,89 @@ def fetch_google_trends() -> list[dict]:
     except Exception as e:
         print(f"[google_trends] {e}")
         return []
+
+
+# ── SEO / Demand Research Agent ───────────────────────────────────────────────
+def collect_research_signals(seed: str) -> dict:
+    """Collect lightweight cross-channel signals for a seed keyword."""
+    seed_lower = (seed or "").lower()
+    sources = {
+        "github": fetch_github,
+        "reddit": fetch_reddit,
+        "youtube": fetch_youtube,
+        "producthunt": fetch_producthunt,
+        "google_trends": fetch_google_trends,
+        "hackernews": fetch_hackernews,
+    }
+    signals = {}
+    for name, fn in sources.items():
+        try:
+            items = fn()
+            matched = []
+            for item in items:
+                haystack = " ".join([
+                    str(item.get("title", "")),
+                    str(item.get("summary", "")),
+                    str(item.get("category", "")),
+                ]).lower()
+                if not seed_lower or seed_lower in haystack:
+                    matched.append(item)
+            signals[name] = (matched or items)[:8]
+        except Exception as e:
+            print(f"[research:{name}] {e}")
+            signals[name] = []
+    return signals
+
+
+def _signal_lines(signals: dict) -> str:
+    lines = []
+    for source, items in signals.items():
+        lines.append(f"## {source}")
+        if not items:
+            lines.append("- 暂无有效信号")
+            continue
+        for item in items[:8]:
+            title = item.get("title", "")
+            heat = item.get("heatLabel", "")
+            url = item.get("url", "")
+            author = item.get("author", "")
+            lines.append(f"- {title} | {heat} | {author} | {url}")
+    return "\n".join(lines)
+
+
+def build_research_report(seed: str, product: str, goal: str, signals: dict) -> str:
+    system = """你是全渠道市场情报与SEO需求挖掘专家。你擅长从搜索趋势、社区讨论、开源项目、视频内容和产品评论里提炼用户痛点、竞品缺口和高意图关键词。输出必须具体、可执行，避免空泛营销话术。"""
+    prompt = f"""请基于以下多渠道信号，为产品做一份中文市场机会分析报告。
+
+种子词：{seed}
+目标产品：{product}
+战术目标：{goal}
+
+多渠道信号：
+{_signal_lines(signals)}
+
+请严格按以下结构输出 Markdown：
+# 市场机会分析报告
+
+## 1. 一句话机会判断
+用一句话判断这个方向是否值得做，以及为什么。
+
+## 2. 趋势信号
+按 Google Trends / GitHub / Reddit / YouTube / Product Hunt / Hacker News 分点总结，每点必须引用来源名称。
+
+## 3. 用户痛点与原声
+提取 5-8 个用户可能正在表达的痛点。尽量使用接近用户原话的表达。
+
+## 4. 竞品防线缺口
+总结竞品或现有方案在哪些地方弱：价格、部署、稳定性、技术门槛、隐私、工作流复杂度。
+
+## 5. 高意图关键词
+输出 12 个关键词，分为：功能词、对比词、场景词。每个词给出搜索意图和内容角度。
+
+## 6. 内容切入点
+给出 8 个可直接用于博客/推文/视频的标题。
+
+## 7. 下一步验证动作
+给出 5 个低成本验证动作，例如写文章、发帖、做对比页、搜索更多评论等。
+"""
+    return call_deepseek(prompt, system=system, max_tokens=5000)
