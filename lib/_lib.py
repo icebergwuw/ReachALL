@@ -579,7 +579,7 @@ def search_youtube_videos(seed: str) -> list[dict]:
 
 # ── SEO / Demand Research Agent ───────────────────────────────────────────────
 def collect_research_signals(seed: str) -> dict:
-    """Collect cross-channel signals — trending feeds + deep search."""
+    """Collect cross-channel signals — trending feeds."""
     seed_lower = (seed or "").lower()
     sources = {
         "github": fetch_github,
@@ -606,19 +606,6 @@ def collect_research_signals(seed: str) -> dict:
         except Exception as e:
             print(f"[research:{name}] {e}")
             signals[name] = []
-
-    # Deep search signals — GitHub Issues, Reddit posts, YouTube videos
-    for name, fn in [
-        ("github_issues", search_github_issues),
-        ("reddit_posts", search_reddit_posts),
-        ("youtube_videos", search_youtube_videos),
-    ]:
-        try:
-            items = fn(seed)
-            signals[name] = items[:8]
-        except Exception as e:
-            print(f"[research:{name}] {e}")
-            signals[name] = []
     return signals
 
 
@@ -634,25 +621,12 @@ def _signal_lines(signals: dict) -> str:
             heat = item.get("heatLabel", "")
             url = item.get("url", "")
             author = item.get("author", "")
-            body = item.get("body", "") or item.get("selftext", "") or ""
-            comments_list = item.get("comments") or []
             lines.append(f"- {title} | {heat} | {author} | {url}")
-            if body:
-                lines.append(f"  内容摘要: {body[:400]}")
-            if comments_list and isinstance(comments_list, (list, tuple)):
-                for ci, comment in enumerate(comments_list[:5]):
-                    lines.append(f"  评论{ci+1}: {comment[:300]}")
     return "\n".join(lines)
 
 
 def build_research_report(seed: str, product: str, goal: str, signals: dict) -> str:
-    system = """你是全渠道市场情报与SEO需求挖掘专家。你擅长从搜索趋势、社区讨论、开源项目Issue和视频内容评论里提炼用户痛点、竞品缺口和高意图关键词。
-
-严格遵循以下原则：
-1. 审查每个信号源的 title / body / selftext / comments。
-2. 优先引用 youtube_videos 的评论、github_issues 的 body、reddit_posts 的 selftext 作为用户原声。
-3. 按指定结构输出，每个论据引用具体的来源和 URL。
-4. 输出必须具体、可执行，避免空泛营销话术。"""
+    system = """你是全渠道市场情报与SEO需求挖掘专家。你擅长从搜索趋势、社区讨论、开源项目、视频内容和产品评论里提炼用户痛点、竞品缺口和高意图关键词。输出必须具体、可执行，避免空泛营销话术。"""
     prompt = f"""请基于以下多渠道信号，为产品做一份中文市场机会分析报告。
 
 种子词：{seed}
