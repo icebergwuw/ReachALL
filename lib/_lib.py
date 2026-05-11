@@ -7,9 +7,11 @@
 import json
 import os
 import time
+import datetime as _dt
+import xml.etree.ElementTree as ET
 import urllib.request
 import urllib.error
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from typing import Any
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -22,6 +24,7 @@ _UA_MOBILE = (
     "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
 )
 TIMEOUT = 10
+YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 
 # ── LLM providers ─────────────────────────────────────────────────────────────
 MINIMAX_API_KEY = os.environ.get("MINIMAX_API_KEY", "")
@@ -108,6 +111,12 @@ PLATFORM_GUIDES = {
     "bilibili": {"name": "B站",    "max_len": 200, "style": "二次元/科技向，有趣有深度，结尾@相关UP主方向"},
     "v2ex":     {"name": "V2EX",  "max_len": 300, "style": "技术社区，干货为主，理性客观，程序员视角"},
     "wechat":   {"name": "微信公众号", "max_len": 2000, "style": "专业深度，有故事有干货，适合长文"},
+    "github":   {"name": "GitHub", "max_len": 280, "style": "面向开发者，突出项目价值、技术亮点和可尝试场景"},
+    "reddit":   {"name": "Reddit", "max_len": 300, "style": "英文社区讨论感，观点直接，适合引发评论互动"},
+    "hackernews": {"name": "Hacker News", "max_len": 300, "style": "技术创业视角，理性克制，强调问题、洞察和可验证价值"},
+    "producthunt": {"name": "Product Hunt", "max_len": 260, "style": "新产品发布口吻，强调一句话价值、使用场景和行动号召"},
+    "youtube":  {"name": "YouTube", "max_len": 300, "style": "视频标题/简介风格，开头抓注意力，适合频道观众点击"},
+    "google_trends": {"name": "Google Trends", "max_len": 280, "style": "全球趋势解读，快速说明为什么火、和AI效率工具的关联"},
 }
 
 TONE_GUIDES = {
@@ -138,6 +147,17 @@ def _fetch_json(url: str, headers: dict = None) -> Any:
     req = urllib.request.Request(url, headers=headers or {"User-Agent": _UA_DESKTOP})
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
         return json.loads(r.read().decode("utf-8"))
+
+
+def _fetch_text(url: str, headers: dict = None) -> str:
+    req = urllib.request.Request(url, headers=headers or {"User-Agent": _UA_DESKTOP})
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+        return r.read().decode("utf-8", errors="replace")
+
+
+def _xml_text(node, tag: str) -> str:
+    found = node.find(tag)
+    return (found.text or "").strip() if found is not None else ""
 
 
 def _format_heat(n: int | None) -> str:
@@ -244,4 +264,170 @@ def fetch_v2ex() -> list[dict]:
         return result
     except Exception as e:
         print(f"[v2ex] {e}")
+        return []
+
+
+def fetch_github() -> list[dict]:
+    try:
+        since = (_dt.date.today() - _dt.timedelta(days=14)).isoformat()
+        query = f"stars:>500 pushed:>{since}"
+        url = "https://api.github.com/search/repositories?" + urlencode({
+            "q": query,
+            "sort": "stars",
+            "order": "desc",
+            "per_page": 20,
+        })
+        data = _fetch_json(url, headers={
+            "User-Agent": "ReachALL/1.0",
+            "Accept": "application/vnd.github+json",
+        })
+        result = []
+        for i, item in enumerate(data.get("items", [])[:20]):
+            stars = item.get("stargazers_count", 0)
+            result.append({
+                "id": f"gh_{item.get('full_name', i)}", "platform": "github", "rank": i + 1,
+                "title": item.get("full_name", ""), "heat": stars,
+                "heatLabel": f"{_format_heat(stars)} stars",
+                "category": item.get("language") or "Repository",
+                "url": item.get("html_url", ""),
+                "author": item.get("owner", {}).get("login", ""),
+                "summary": item.get("description") or "",
+            })
+        return result
+    except Exception as e:
+        print(f"[github] {e}")
+        return []
+
+
+def fetch_reddit() -> list[dict]:
+    try:
+        subs = "technology+artificial+ChatGPT+LocalLLaMA+programming+startups+Entrepreneur"
+        data = _fetch_json(
+            f"https://www.reddit.com/r/{subs}/hot.json?limit=25",
+            headers={"User-Agent": "ReachALL/1.0 trend reader"},
+        )
+        result = []
+        for i, child in enumerate(data.get("data", {}).get("children", [])[:20]):
+            item = child.get("data", {})
+            score = item.get("score", 0)
+            permalink = item.get("permalink", "")
+            result.append({
+                "id": f"rd_{item.get('id', i)}", "platform": "reddit", "rank": i + 1,
+                "title": item.get("title", ""), "heat": score,
+                "heatLabel": f"{score} 分",
+                "category": f"r/{item.get('subreddit', '')}",
+                "url": "https://www.reddit.com" + permalink if permalink.startswith("/") else permalink,
+                "author": item.get("author", ""),
+            })
+        return result
+    except Exception as e:
+        print(f"[reddit] {e}")
+        return []
+
+
+def fetch_hackernews() -> list[dict]:
+    try:
+        data = _fetch_json(
+            "https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=20",
+            headers={"User-Agent": "ReachALL/1.0"},
+        )
+        result = []
+        for i, item in enumerate(data.get("hits", [])[:20]):
+            points = item.get("points") or 0
+            comments = item.get("num_comments") or 0
+            story_id = item.get("objectID", i)
+            result.append({
+                "id": f"hn_{story_id}", "platform": "hackernews", "rank": i + 1,
+                "title": item.get("title") or item.get("story_title", ""), "heat": points,
+                "heatLabel": f"{points} 分 · {comments} 评论",
+                "category": "Hacker News",
+                "url": item.get("url") or f"https://news.ycombinator.com/item?id={story_id}",
+                "author": item.get("author", ""),
+            })
+        return result
+    except Exception as e:
+        print(f"[hackernews] {e}")
+        return []
+
+
+def fetch_producthunt() -> list[dict]:
+    try:
+        xml = _fetch_text("https://www.producthunt.com/feed", headers={"User-Agent": _UA_DESKTOP})
+        root = ET.fromstring(xml)
+        result = []
+        entries = root.findall("{http://www.w3.org/2005/Atom}entry")
+        for i, item in enumerate(entries[:20]):
+            title = _xml_text(item, "{http://www.w3.org/2005/Atom}title")
+            link = item.find("{http://www.w3.org/2005/Atom}link")
+            url = link.attrib.get("href", "") if link is not None else ""
+            desc = _xml_text(item, "{http://www.w3.org/2005/Atom}content") or _xml_text(item, "{http://www.w3.org/2005/Atom}summary")
+            result.append({
+                "id": f"ph_{i}", "platform": "producthunt", "rank": i + 1,
+                "title": title, "heat": 20 - i,
+                "heatLabel": "Product Hunt",
+                "category": "Product",
+                "url": url,
+                "summary": desc,
+            })
+        return result
+    except Exception as e:
+        print(f"[producthunt] {e}")
+        return []
+
+
+def fetch_youtube() -> list[dict]:
+    try:
+        if not YOUTUBE_API_KEY:
+            return []
+        query = "AI OR OpenAI OR Claude OR startup OR technology"
+        url = "https://www.googleapis.com/youtube/v3/search?" + urlencode({
+            "part": "snippet",
+            "type": "video",
+            "order": "relevance",
+            "publishedAfter": (_dt.datetime.utcnow() - _dt.timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "maxResults": 20,
+            "q": query,
+            "key": YOUTUBE_API_KEY,
+        })
+        data = _fetch_json(url, headers={"User-Agent": "ReachALL/1.0"})
+        result = []
+        for i, item in enumerate(data.get("items", [])[:20]):
+            video_id = item.get("id", {}).get("videoId", "")
+            snippet = item.get("snippet", {})
+            result.append({
+                "id": f"yt_{video_id or i}", "platform": "youtube", "rank": i + 1,
+                "title": snippet.get("title", ""), "heat": 20 - i,
+                "heatLabel": "YouTube",
+                "category": "Video",
+                "url": f"https://www.youtube.com/watch?v={video_id}" if video_id else "https://www.youtube.com",
+                "author": snippet.get("channelTitle", ""),
+                "publishedAt": snippet.get("publishedAt", ""),
+            })
+        return result
+    except Exception as e:
+        print(f"[youtube] {e}")
+        return []
+
+
+def fetch_google_trends() -> list[dict]:
+    try:
+        xml = _fetch_text(
+            "https://trends.google.com/trending/rss?geo=US&hl=en-US",
+            headers={"User-Agent": _UA_DESKTOP},
+        )
+        root = ET.fromstring(xml)
+        result = []
+        for i, item in enumerate(root.findall("./channel/item")[:20]):
+            title = _xml_text(item, "title")
+            traffic = _xml_text(item, "{https://trends.google.com/trending/rss}approx_traffic")
+            result.append({
+                "id": f"gt_{i}", "platform": "google_trends", "rank": i + 1,
+                "title": title, "heat": 20 - i,
+                "heatLabel": traffic or "Google Trends",
+                "category": "Trending Search",
+                "url": _xml_text(item, "link") or f"https://www.google.com/search?q={quote(title)}",
+            })
+        return result
+    except Exception as e:
+        print(f"[google_trends] {e}")
         return []

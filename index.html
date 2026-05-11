@@ -226,6 +226,12 @@
     .pf-btn.xhs.active  { background: var(--xhs);    color: #fff; border-color: var(--xhs);    }
     .pf-btn.bili.active { background: #00a1d6;        color: #fff; border-color: #00a1d6;       }
     .pf-btn.v2.active   { background: #3b82f6;        color: #fff; border-color: #3b82f6;       }
+.pf-btn.gh.active   { background: #6e7681;        color: #fff; border-color: #6e7681;       }
+.pf-btn.rd.active   { background: #ff4500;        color: #fff; border-color: #ff4500;       }
+.pf-btn.hn.active   { background: #ff6600;        color: #fff; border-color: #ff6600;       }
+.pf-btn.ph.active   { background: #da552f;        color: #fff; border-color: #da552f;       }
+.pf-btn.yt.active   { background: #ff0000;        color: #fff; border-color: #ff0000;       }
+.pf-btn.gt.active   { background: #4285f4;        color: #fff; border-color: #4285f4;       }
 
     .refresh-btn {
       display: flex;
@@ -404,6 +410,12 @@
     .tag-xhs      { background: rgba(255,36,66,0.12);  color: #ff6680; }
     .tag-bilibili { background: rgba(0,161,214,0.12);  color: #00a1d6; }
     .tag-v2ex     { background: rgba(125,211,252,0.1); color: #7dd3fc; }
+    .tag-github   { background: rgba(110,118,129,0.14); color: #aeb7c2; }
+    .tag-reddit   { background: rgba(255,69,0,0.14); color: #ff7a45; }
+    .tag-hackernews { background: rgba(255,102,0,0.14); color: #ff9f43; }
+    .tag-producthunt { background: rgba(218,85,47,0.14); color: #ff8a65; }
+    .tag-youtube  { background: rgba(255,0,0,0.12); color: #ff6b6b; }
+    .tag-google-trends { background: rgba(66,133,244,0.14); color: #8ab4f8; }
 
     .heat-bar {
       display: flex;
@@ -942,6 +954,12 @@
         <button class="pf-btn xhs" onclick="setPlatformFilter('xhs', this)">小红书</button>
         <button class="pf-btn bili" onclick="setPlatformFilter('bilibili', this)">B站</button>
         <button class="pf-btn v2" onclick="setPlatformFilter('v2ex', this)">V2EX</button>
+        <button class="pf-btn gh" onclick="setPlatformFilter('github', this)">GitHub</button>
+        <button class="pf-btn rd" onclick="setPlatformFilter('reddit', this)">Reddit</button>
+        <button class="pf-btn hn" onclick="setPlatformFilter('hackernews', this)">HN</button>
+        <button class="pf-btn ph" onclick="setPlatformFilter('producthunt', this)">Product Hunt</button>
+        <button class="pf-btn yt" onclick="setPlatformFilter('youtube', this)">YouTube</button>
+        <button class="pf-btn gt" onclick="setPlatformFilter('google_trends', this)">Google Trends</button>
       </div>
       <button class="refresh-btn" id="refresh-btn" onclick="loadTrends()">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -1031,6 +1049,12 @@
             <button class="plat-select-btn dy" data-plat="douyin" onclick="selectPlat(this)">抖音</button>
             <button class="plat-select-btn xhs" data-plat="xhs" onclick="selectPlat(this)">小红书</button>
             <button class="plat-select-btn wx" data-plat="wechat" onclick="selectPlat(this)">微信公众号</button>
+            <button class="plat-select-btn" data-plat="github" onclick="selectPlat(this)">GitHub</button>
+            <button class="plat-select-btn" data-plat="reddit" onclick="selectPlat(this)">Reddit</button>
+            <button class="plat-select-btn" data-plat="hackernews" onclick="selectPlat(this)">HN</button>
+            <button class="plat-select-btn" data-plat="producthunt" onclick="selectPlat(this)">Product Hunt</button>
+            <button class="plat-select-btn" data-plat="youtube" onclick="selectPlat(this)">YouTube</button>
+            <button class="plat-select-btn" data-plat="google_trends" onclick="selectPlat(this)">Google Trends</button>
           </div>
         </div>
 
@@ -1111,6 +1135,12 @@ const PLAT_META = {
   xhs:      { label: '小红书', tagClass: 'tag-xhs'     },
   bilibili: { label: 'B站',    tagClass: 'tag-bilibili'},
   v2ex:     { label: 'V2EX',   tagClass: 'tag-v2ex'    },
+  github:   { label: 'GitHub', tagClass: 'tag-github'  },
+  reddit:   { label: 'Reddit', tagClass: 'tag-reddit'  },
+  hackernews: { label: 'HN', tagClass: 'tag-hackernews' },
+  producthunt: { label: 'Product Hunt', tagClass: 'tag-producthunt' },
+  youtube:  { label: 'YouTube', tagClass: 'tag-youtube' },
+  google_trends: { label: 'Google Trends', tagClass: 'tag-google-trends' },
 };
 
 // ── SERVER STATUS ──
@@ -1282,7 +1312,7 @@ function setPlatformFilter(plat, btn) {
 function filterPlatform(plat) {
   currentPlatFilter = plat;
   document.querySelectorAll('.pf-btn').forEach(b => b.classList.remove('active'));
-  const map = { weibo: 1, douyin: 2, xhs: 3, bilibili: 4, v2ex: 5 };
+  const map = { weibo: 1, douyin: 2, xhs: 3, bilibili: 4, v2ex: 5, github: 6, reddit: 7, hackernews: 8, producthunt: 9, youtube: 10, google_trends: 11 };
   const idx = map[plat];
   if (idx !== undefined) document.querySelectorAll('.pf-btn')[idx]?.classList.add('active');
   switchView('trends', document.querySelectorAll('.nav-item')[0]);
@@ -1581,7 +1611,7 @@ function renderLibrary() {
   grid.innerHTML = library.map(entry => `
     <div class="lib-card">
       <div class="lib-card-header">
-        <span class="lib-card-platform platform-tag ${platClass[entry.platform]}">${platName[entry.platform]} · ${entry.tone}</span>
+        <span class="lib-card-platform platform-tag ${(PLAT_META[entry.platform] || PLAT_META.weibo).tagClass}">${(PLAT_META[entry.platform] || {label: entry.platform}).label} · ${entry.tone}</span>
         <span class="lib-card-date">${entry.createdAt}</span>
       </div>
       <div class="lib-card-content">${entry.content}</div>

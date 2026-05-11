@@ -1,5 +1,5 @@
 """
-GET /api/trends?platform=all|weibo|bilibili|douyin|v2ex
+GET /api/trends?platform=all|weibo|bilibili|douyin|v2ex|github|reddit|hackernews|producthunt|youtube|google_trends
 """
 import json, sys, os, time
 from http.server import BaseHTTPRequestHandler
@@ -7,7 +7,24 @@ from urllib.parse import urlparse, parse_qs
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-from _lib import fetch_weibo, fetch_bilibili, fetch_douyin, fetch_v2ex
+from _lib import (
+    fetch_weibo, fetch_bilibili, fetch_douyin, fetch_v2ex,
+    fetch_github, fetch_reddit, fetch_hackernews, fetch_producthunt,
+    fetch_youtube, fetch_google_trends,
+)
+
+FETCHERS = {
+    "weibo":         fetch_weibo,
+    "bilibili":      fetch_bilibili,
+    "douyin":        fetch_douyin,
+    "v2ex":          fetch_v2ex,
+    "github":        fetch_github,
+    "reddit":        fetch_reddit,
+    "hackernews":    fetch_hackernews,
+    "producthunt":   fetch_producthunt,
+    "youtube":       fetch_youtube,
+    "google_trends": fetch_google_trends,
+}
 
 
 class handler(BaseHTTPRequestHandler):
@@ -16,12 +33,7 @@ class handler(BaseHTTPRequestHandler):
         params = parse_qs(parsed.query)
         platform = params.get("platform", ["all"])[0]
 
-        fetchers = {
-            "weibo":    fetch_weibo,
-            "bilibili": fetch_bilibili,
-            "douyin":   fetch_douyin,
-            "v2ex":     fetch_v2ex,
-        }
+        fetchers = FETCHERS
 
         items, sources = [], {}
 
