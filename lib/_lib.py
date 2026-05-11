@@ -461,9 +461,125 @@ def fetch_google_trends() -> list[dict]:
         return []
 
 
+# ── Deep Search Functions ─────────────────────────────────────────────────────
+def search_github_issues(seed: str) -> list[dict]:
+    """Search GitHub Issues for real user complaints, feature requests, bugs."""
+    try:
+        query = f'"{seed}" is:issue state:open comments:>1'
+        url = "https://api.github.com/search/issues?" + urlencode({
+            "q": query,
+            "sort": "reactions",
+            "order": "desc",
+            "per_page": 10,
+        })
+        data = _fetch_json(url, headers={
+            "User-Agent": "ReachALL/1.0",
+            "Accept": "application/vnd.github+json",
+        })
+        result = []
+        for i, item in enumerate(data.get("items", [])[:10]):
+            repo = item.get("repository_url", "").replace("https://api.github.com/repos/", "")
+            result.append({
+                "id": f"ghi_{item.get('id', i)}", "platform": "github_issue", "rank": i + 1,
+                "title": item.get("title", ""),
+                "body": (item.get("body") or "")[:800],
+                "state": item.get("state", "open"),
+                "comments": item.get("comments", 0),
+                "url": item.get("html_url", ""),
+                "repo": repo,
+                "heat": item.get("comments", 0) * 100,
+                "heatLabel": f"{item.get('comments', 0)} comments",
+            })
+        return result
+    except Exception as e:
+        print(f"[github_issues] {e}")
+        return []
+
+
+def search_reddit_posts(seed: str) -> list[dict]:
+    """Search Reddit for real user voices and complaints bearing seed keyword."""
+    try:
+        query = f'"{seed}"'
+        data = _fetch_json(
+            "https://api.pullpush.io/reddit/search/submission/?" + urlencode({
+                "q": query,
+                "sort_type": "score",
+                "sort": "desc",
+                "size": 10,
+            }),
+            headers={"User-Agent": "ReachALL/1.0 trend reader"},
+        )
+        result = []
+        for i, item in enumerate(data.get("data", [])[:10]):
+            score = item.get("score", 0)
+            permalink = item.get("permalink", "")
+            result.append({
+                "id": f"rdp_{item.get('id', i)}", "platform": "reddit_post", "rank": i + 1,
+                "title": item.get("title", ""),
+                "selftext": (item.get("selftext") or "")[:600],
+                "heat": score,
+                "heatLabel": f"{score} 分",
+                "category": f"r/{item.get('subreddit', '')}",
+                "url": "https://www.reddit.com" + permalink if permalink.startswith("/") else item.get("url", ""),
+                "author": item.get("author", ""),
+            })
+        return result
+    except Exception as e:
+        print(f"[reddit_search] {e}")
+        return []
+
+
+def search_youtube_videos(seed: str) -> list[dict]:
+    """Search YouTube videos + fetch top comments for each result."""
+    try:
+        if not YOUTUBE_API_KEY:
+            return []
+        url = "https://www.googleapis.com/youtube/v3/search?" + urlencode({
+            "part": "snippet",
+            "type": "video",
+            "order": "relevance",
+            "maxResults": 5,
+            "q": seed,
+            "key": YOUTUBE_API_KEY,
+        })
+        data = _fetch_json(url, headers={"User-Agent": "ReachALL/1.0"})
+        result = []
+        for i, item in enumerate(data.get("items", [])[:5]):
+            video_id = item.get("id", {}).get("videoId", "")
+            snippet = item.get("snippet", {})
+            comments = []
+            if video_id:
+                try:
+                    comments_url = "https://www.googleapis.com/youtube/v3/commentThreads?" + urlencode({
+                        "part": "snippet",
+                        "videoId": video_id,
+                        "maxResults": 5,
+                        "order": "relevance",
+                        "key": YOUTUBE_API_KEY,
+                    })
+                    comments_data = _fetch_json(comments_url, headers={"User-Agent": "ReachALL/1.0"})
+                    for c in (comments_data.get("items") or [])[:5]:
+                        top = c.get("snippet", {}).get("topLevelComment", {}).get("snippet", {})
+                        comments.append(top.get("textDisplay", ""))
+                except Exception:
+                    pass
+            result.append({
+                "id": f"ytv_{video_id or i}", "platform": "youtube_video", "rank": i + 1,
+                "title": snippet.get("title", ""),
+                "description": (snippet.get("description", ""))[:400],
+                "author": snippet.get("channelTitle", ""),
+                "url": f"https://www.youtube.com/watch?v={video_id}" if video_id else "https://www.youtube.com",
+                "comments": comments,
+            })
+        return result
+    except Exception as e:
+        print(f"[youtube_search] {e}")
+        return []
+
+
 # ── SEO / Demand Research Agent ───────────────────────────────────────────────
 def collect_research_signals(seed: str) -> dict:
-    """Collect lightweight cross-channel signals for a seed keyword."""
+    """Collect cross-channel signals — trending feeds + deep search."""
     seed_lower = (seed or "").lower()
     sources = {
         "github": fetch_github,
@@ -490,6 +606,19 @@ def collect_research_signals(seed: str) -> dict:
         except Exception as e:
             print(f"[research:{name}] {e}")
             signals[name] = []
+
+    # Deep search signals — GitHub Issues, Reddit posts, YouTube videos
+    for name, fn in [
+        ("github_issues", search_github_issues),
+        ("reddit_posts", search_reddit_posts),
+        ("youtube_videos", search_youtube_videos),
+    ]:
+        try:
+            items = fn(seed)
+            signals[name] = items[:8]
+        except Exception as e:
+            print(f"[research:{name}] {e}")
+            signals[name] = []
     return signals
 
 
@@ -505,12 +634,25 @@ def _signal_lines(signals: dict) -> str:
             heat = item.get("heatLabel", "")
             url = item.get("url", "")
             author = item.get("author", "")
+            body = item.get("body", "") or item.get("selftext", "") or ""
+            comments_list = item.get("comments") or []
             lines.append(f"- {title} | {heat} | {author} | {url}")
+            if body:
+                lines.append(f"  内容摘要: {body[:400]}")
+            if comments_list and isinstance(comments_list, (list, tuple)):
+                for ci, comment in enumerate(comments_list[:5]):
+                    lines.append(f"  评论{ci+1}: {comment[:300]}")
     return "\n".join(lines)
 
 
 def build_research_report(seed: str, product: str, goal: str, signals: dict) -> str:
-    system = """你是全渠道市场情报与SEO需求挖掘专家。你擅长从搜索趋势、社区讨论、开源项目、视频内容和产品评论里提炼用户痛点、竞品缺口和高意图关键词。输出必须具体、可执行，避免空泛营销话术。"""
+    system = """你是全渠道市场情报与SEO需求挖掘专家。你擅长从搜索趋势、社区讨论、开源项目Issue和视频内容评论里提炼用户痛点、竞品缺口和高意图关键词。
+
+严格遵循以下原则：
+1. 审查每个信号源的 title / body / selftext / comments。
+2. 优先引用 youtube_videos 的评论、github_issues 的 body、reddit_posts 的 selftext 作为用户原声。
+3. 按指定结构输出，每个论据引用具体的来源和 URL。
+4. 输出必须具体、可执行，避免空泛营销话术。"""
     prompt = f"""请基于以下多渠道信号，为产品做一份中文市场机会分析报告。
 
 种子词：{seed}
@@ -530,7 +672,7 @@ def build_research_report(seed: str, product: str, goal: str, signals: dict) -> 
 按 Google Trends / GitHub / Reddit / YouTube / Product Hunt / Hacker News 分点总结，每点必须引用来源名称。
 
 ## 3. 用户痛点与原声
-提取 5-8 个用户可能正在表达的痛点。尽量使用接近用户原话的表达。
+提取 5-8 个真实用户痛点。优先使用 GitHub Issues 的 body、Reddit 帖子的 selftext、YouTube 视频评论的原话。
 
 ## 4. 竞品防线缺口
 总结竞品或现有方案在哪些地方弱：价格、部署、稳定性、技术门槛、隐私、工作流复杂度。
