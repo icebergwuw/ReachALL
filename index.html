@@ -1045,6 +1045,8 @@
         <button class="pf-btn gt" onclick="setPlatformFilter('google_trends', this)">Google Trends</button>
         <button class="pf-btn tw" onclick="setPlatformFilter('twitter', this)">X</button>
       </div>
+      <div class="platform-filter" id="gt-sub-filter" style="display:none;margin-top:6px;flex-wrap:wrap;gap:5px">
+      </div>
       <button class="refresh-btn" id="refresh-btn" onclick="loadTrends()">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
           <path d="M14 8A6 6 0 1 1 8 2a6 6 0 0 1 4.24 1.76L14 2v4h-4l1.5-1.5"/>
@@ -1249,6 +1251,7 @@ const API_BASE = location.hostname === 'localhost' ? 'http://localhost:8765' : '
 let allTrends = [];
 let filteredTrends = [];
 let currentPlatFilter = 'all';
+let currentCategoryFilter = '';
 let library = JSON.parse(localStorage.getItem('reachall_library') || '[]');
 let currentTopic = null;
 let currentPlatform = 'weibo';
@@ -1372,6 +1375,11 @@ function applyFilter() {
     ? [...allTrends]
     : allTrends.filter(t => t.platform === currentPlatFilter);
 
+  if (currentCategoryFilter) {
+    filteredTrends = filteredTrends.filter(t =>
+      (t.category || '') === currentCategoryFilter);
+  }
+
   // Re-rank within filter
   filteredTrends.sort((a, b) => b.heat - a.heat);
   filteredTrends.forEach((t, i) => t.displayRank = i + 1);
@@ -1439,8 +1447,27 @@ function renderTrends() {
 
 function setPlatformFilter(plat, btn) {
   currentPlatFilter = plat;
+  currentCategoryFilter = '';
   document.querySelectorAll('.pf-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  const sub = document.getElementById('gt-sub-filter');
+  if (sub) {
+    if (plat === 'google_trends') {
+      sub.style.display = 'flex';
+      const cats = [...new Set(allTrends.filter(t => t.platform === 'google_trends').map(t => t.category || '').filter(Boolean))].sort();
+      sub.innerHTML = '<span class="pf-btn active" style="font-size:11px;padding:3px 9px;border-radius:99px" onclick="setGtSubFilter(\'\', this)">All GT</span>' +
+        cats.map(c => `<span class="pf-btn" style="font-size:11px;padding:3px 9px;border-radius:99px" onclick="setGtSubFilter('${c.replace(/'/g, "\\'")}', this)">${escapeHtml(c)}</span>`).join('');
+    } else {
+      sub.style.display = 'none';
+    }
+  }
+  applyFilter();
+}
+
+function setGtSubFilter(cat, btn) {
+  currentCategoryFilter = cat;
+  document.querySelectorAll('#gt-sub-filter .pf-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
   applyFilter();
 }
 
