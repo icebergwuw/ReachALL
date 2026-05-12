@@ -803,20 +803,6 @@ def collect_research_signals(seed: str) -> dict:
             print(f"[research:{name}] {e}")
             signals[name] = []
 
-    # Deep search signals (lightweight — max 3 per source, tight timeout)
-    deep_sources = [
-        ("github_issues", lambda: search_github_issues(seed)),
-        ("reddit_posts_v2", lambda: search_reddit_posts_v2(seed)),
-        ("youtube_competitor", lambda: search_youtube_competitor(seed)),
-        ("github_repo_issues", search_github_repo_issues),
-    ]
-    for name, fn in deep_sources:
-        try:
-            items = fn()
-            signals[name] = items[:2]
-        except Exception as e:
-            print(f"[research:{name}] {e}")
-            signals[name] = []
     return signals
 
 
