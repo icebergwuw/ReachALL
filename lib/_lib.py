@@ -1022,37 +1022,44 @@ Decide your next action. Output ONLY the JSON (format A or B)."""
 
 
 def run_demand_research_agent(seed: str, product: str = "EasyClaw", goal: str = "") -> dict:
-    """Run the autonomous demand research agent (2-pass architecture)."""
-    MAX_TOOLS = 3
+    """Run the demand research agent — 1 LLM call + predefined tool strategy."""
+    import concurrent.futures
 
-    # Pass 1: plan tools
-    plan_prompt = f"""Seed: "{seed}" | Product: {product} | Goal: {goal}
-Pick up to {MAX_TOOLS} tools from: {json.dumps([t['name'] for t in AGENT_TOOLS_JSON])}
-Output JSON: {{"tools":[{{"name":"search_github_issues","args":{{"seed":"web scraping"}}}}]}}
-Choose seeds STRATEGICALLY — use the seed directly, or craft competitor/pain/use-case variants."""
-    plan_raw = call_deepseek(plan_prompt, system=AGENT_SYSTEM_PROMPT, max_tokens=400)
-    plan = _parse_json_object(plan_raw)
-    planned = plan.get("tools", []) if isinstance(plan, dict) else []
+    # Fixed strategy: search across all channels with seed and 2 key variants
+    variants = [
+        seed,
+        f"{seed} problem",
+        f"{seed} alternative",
+    ]
+    all_tasks = []
+    for v in variants:
+        for tool_name, tool_fn in TOOLS.items():
+            all_tasks.append((tool_name, v, tool_fn))
 
-    # Pass 2: execute tools
+    # Execute all tool calls concurrently
     tool_calls_log = []
     all_evidence = []
-    for i, tool_def in enumerate(planned[:MAX_TOOLS]):
-        action = tool_def.get("name", "") if isinstance(tool_def, dict) else ""
-        args = tool_def.get("args", {}) if isinstance(tool_def, dict) else {}
-        tool_seed = (args.get("seed") or seed) if isinstance(args, dict) else seed
-        if action not in TOOLS:
-            continue
-        try:
-            tool_name, items = TOOLS[action](tool_seed)
-            summary = _format_tool_result(tool_name, items)
-            all_evidence.append(f"[Tool {i+1} - {tool_name}({tool_seed})]\n{summary}")
-            tool_calls_log.append({"step": i+1, "tool": tool_name, "seed": tool_seed, "results": len(items)})
-        except Exception as e:
-            print(f"[agent] tool {action} error {e}")
+    i = 0
 
-    # Pass 3: synthesize report
-    evidence_text = "\n\n".join(all_evidence)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        futures = {}
+        for tool_name, tool_seed, tool_fn in all_tasks:
+            futures[executor.submit(tool_fn, tool_seed)] = (tool_name, tool_seed)
+
+        for future in concurrent.futures.as_completed(futures, timeout=25):
+            tool_name, tool_seed = futures[future]
+            i += 1
+            try:
+                res_name, items = future.result()
+                if items:
+                    summary = _format_tool_result(res_name, items)
+                    all_evidence.append(f"[Tool {i} - {res_name}({tool_seed})]\n{summary}")
+                    tool_calls_log.append({"step": i, "tool": res_name, "seed": tool_seed, "results": len(items)})
+            except Exception as e:
+                print(f"[agent] {tool_name}({tool_seed}) error: {e}")
+
+    # Synthesize report in ONE LLM call
+    evidence_text = "\n\n".join(all_evidence[-12:])  # keep last 12 for context
     system = """你是全渠道市场情报与SEO需求挖掘专家。你必须基于提供的工具调用证据输出中文Markdown报告。
 
 严格结构：
@@ -1070,10 +1077,10 @@ Choose seeds STRATEGICALLY — use the seed directly, or craft competitor/pain/u
 目标：{goal}
 
 多渠道信号证据：
-{evidence_text}
+{evidence_text if evidence_text else '(no evidence collected — use your knowledge)'}
 
 请根据以上证据输出完整报告。"""
-    report = call_deepseek(report_prompt, system=system, max_tokens=3500)
+    report = call_deepseek(report_prompt, system=system, max_tokens=3000)
 
     return {
         "ok": True,
@@ -1081,7 +1088,7 @@ Choose seeds STRATEGICALLY — use the seed directly, or craft competitor/pain/u
         "product": product,
         "goal": goal,
         "model": DEEPSEEK_MODEL,
-        "steps": len(tool_calls_log) + 2,
+        "steps": 1 + len(tool_calls_log),
         "tool_calls": tool_calls_log,
         "report": report,
     }
