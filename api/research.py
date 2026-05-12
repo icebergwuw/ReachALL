@@ -1,13 +1,13 @@
 """
 POST /api/research
 Body: {seed, product, goal}
-Runs the autonomous Demand Research Agent — a ReAct loop with tool access.
+Generates demand research report using pre-collected signals + DeepSeek synthesis.
 """
 import json, sys, os, time
 from http.server import BaseHTTPRequestHandler
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
-from _lib import run_demand_research_agent, DEEPSEEK_MODEL
+from _lib import collect_research_signals, build_research_report, DEEPSEEK_MODEL
 
 
 class handler(BaseHTTPRequestHandler):
@@ -35,12 +35,18 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            import sys as _sys
-            _sys.stderr.write(f"[research] start seed={seed}\n")
-            result = run_demand_research_agent(seed, product, goal)
-            _sys.stderr.write(f"[research] done steps={result.get('steps')} tools={len(result.get('tool_calls',[]))}\n")
-            result["updated_at"] = int(time.time())
-            self._json(result)
+            signals = collect_research_signals(seed)
+            report = build_research_report(seed, product, goal, signals)
+            self._json({
+                "ok": True,
+                "seed": seed,
+                "product": product,
+                "goal": goal,
+                "model": DEEPSEEK_MODEL,
+                "updated_at": int(time.time()),
+                "signals": signals,
+                "report": report,
+            })
         except Exception as e:
             self._json({"ok": False, "error": str(e)}, 500)
 
