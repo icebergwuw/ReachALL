@@ -35,7 +35,10 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
+            import sys as _sys
+            _sys.stderr.write(f"[research] start seed={seed}\n")
             result = run_demand_research_agent(seed, product, goal)
+            _sys.stderr.write(f"[research] done steps={result.get('steps')} tools={len(result.get('tool_calls',[]))}\n")
             result["updated_at"] = int(time.time())
             self._json(result)
         except Exception as e:

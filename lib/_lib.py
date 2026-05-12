@@ -1025,6 +1025,9 @@ def run_demand_research_agent(seed: str, product: str = "EasyClaw", goal: str = 
     """Run the demand research agent — 1 LLM call + predefined tool strategy."""
     import concurrent.futures
 
+    t0 = time.time()
+    print(f"[agent] start seed={seed}", file=__import__('sys').stderr, flush=True)
+
     # Fixed strategy: search across all channels with seed and 2 key variants
     variants = [
         seed,
@@ -1059,6 +1062,8 @@ def run_demand_research_agent(seed: str, product: str = "EasyClaw", goal: str = 
                 print(f"[agent] {tool_name}({tool_seed}) error: {e}")
 
     # Synthesize report in ONE LLM call
+    t_tools = time.time() - t0
+    print(f"[agent] tools done in {t_tools:.1f}s, evidence chunks={len(all_evidence)}", file=__import__('sys').stderr, flush=True)
     evidence_text = "\n\n".join(all_evidence[-12:])  # keep last 12 for context
     system = """你是全渠道市场情报与SEO需求挖掘专家。你必须基于提供的工具调用证据输出中文Markdown报告。
 
