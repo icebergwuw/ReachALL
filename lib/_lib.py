@@ -880,7 +880,7 @@ def build_research_report(seed: str, product: str, goal: str, signals: dict) -> 
 ## 7. 下一步验证动作
 给出 5 个低成本验证动作，例如写文章、发帖、做对比页、搜索更多评论等。
 """
-    return call_deepseek(prompt, system=system, max_tokens=3000)
+    return call_deepseek(prompt, system=system, max_tokens=1500)  # fast
 
 
 def _parse_json_object(text: str) -> dict:
