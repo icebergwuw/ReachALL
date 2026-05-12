@@ -813,7 +813,7 @@ def collect_research_signals(seed: str) -> dict:
     for name, fn in deep_sources:
         try:
             items = fn()
-            signals[name] = items[:3]
+            signals[name] = items[:2]
         except Exception as e:
             print(f"[research:{name}] {e}")
             signals[name] = []
@@ -918,7 +918,7 @@ def _format_tool_result(name: str, items: list[dict]) -> str:
     if not items:
         return f"({name}: 0 results)"
     lines = [f"({name}: {len(items)} results)"]
-    for item in items[:5]:
+    for item in items[:3]:
         title = item.get("title", "")
         body = item.get("body", "") or item.get("selftext", "") or item.get("description", "") or ""
         comments = item.get("comments", "")
@@ -928,7 +928,7 @@ def _format_tool_result(name: str, items: list[dict]) -> str:
         if body:
             lines.append(f"  body: {body[:300]}")
         if isinstance(comments, list) and comments:
-            for ci, c in enumerate(comments[:3]):
+            for ci, c in enumerate(comments[:2]):
                 lines.append(f"  comment{ci+1}: {c[:200]}")
         if isinstance(pain, dict):
             active = {k: v for k, v in pain.items() if v}
@@ -1017,7 +1017,7 @@ Evidence collected so far:
 {history if history else "(no evidence yet — you MUST call tools)"}
 
 Decide your next action. Output ONLY the JSON (format A or B)."""
-    raw = call_deepseek(user_msg, system=AGENT_SYSTEM_PROMPT, max_tokens=800 if history else 400)
+    raw = call_deepseek(user_msg, system=AGENT_SYSTEM_PROMPT, max_tokens=400 if history else 200)
     return _parse_json_object(raw)
 
 
@@ -1026,7 +1026,7 @@ def run_demand_research_agent(seed: str, product: str = "EasyClaw", goal: str = 
 
     Returns {"ok": True/False, "tool_calls": [...], "report": str, "model": str}
     """
-    MAX_STEPS = 8
+    MAX_STEPS = 4
     history_parts = []
     tool_calls_log = []
 
