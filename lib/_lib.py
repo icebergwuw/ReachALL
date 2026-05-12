@@ -1022,67 +1022,66 @@ Decide your next action. Output ONLY the JSON (format A or B)."""
 
 
 def run_demand_research_agent(seed: str, product: str = "EasyClaw", goal: str = "") -> dict:
-    """Run the autonomous demand research agent.
+    """Run the autonomous demand research agent (2-pass architecture)."""
+    MAX_TOOLS = 3
 
-    Returns {"ok": True/False, "tool_calls": [...], "report": str, "model": str}
-    """
-    MAX_STEPS = 4
-    history_parts = []
+    # Pass 1: plan tools
+    plan_prompt = f"""Seed: "{seed}" | Product: {product} | Goal: {goal}
+Pick up to {MAX_TOOLS} tools from: {json.dumps([t['name'] for t in AGENT_TOOLS_JSON])}
+Output JSON: {{"tools":[{{"name":"search_github_issues","args":{{"seed":"web scraping"}}}}]}}
+Choose seeds STRATEGICALLY — use the seed directly, or craft competitor/pain/use-case variants."""
+    plan_raw = call_deepseek(plan_prompt, system=AGENT_SYSTEM_PROMPT, max_tokens=400)
+    plan = _parse_json_object(plan_raw)
+    planned = plan.get("tools", []) if isinstance(plan, dict) else []
+
+    # Pass 2: execute tools
     tool_calls_log = []
-
-    for step in range(1, MAX_STEPS + 1):
-        history_text = "\n".join(history_parts[-5000:])  # keep context window manageable
-        decision = _agent_step(seed, history_text, step)
-
-        if not decision:
-            print(f"[agent] step {step}: failed to parse decision, retrying")
-            continue
-
-        action = decision.get("action", "")
-
-        if action == "finish":
-            report = decision.get("report", "")
-            if not report or len(report) < 100:
-                print(f"[agent] step {step}: finish called but report too short, retrying")
-                continue
-            return {
-                "ok": True,
-                "seed": seed,
-                "product": product,
-                "goal": goal,
-                "model": DEEPSEEK_MODEL,
-                "steps": step,
-                "tool_calls": tool_calls_log,
-                "report": report,
-            }
-
+    all_evidence = []
+    for i, tool_def in enumerate(planned[:MAX_TOOLS]):
+        action = tool_def.get("name", "") if isinstance(tool_def, dict) else ""
+        args = tool_def.get("args", {}) if isinstance(tool_def, dict) else {}
+        tool_seed = (args.get("seed") or seed) if isinstance(args, dict) else seed
         if action not in TOOLS:
-            print(f"[agent] step {step}: unknown action '{action}', retrying")
             continue
-
-        args = decision.get("args", {}) if isinstance(decision.get("args"), dict) else {}
-        tool_seed = args.get("seed", seed) or seed
         try:
             tool_name, items = TOOLS[action](tool_seed)
             summary = _format_tool_result(tool_name, items)
-            history_parts.append(f"[Step {step} - {tool_name}({tool_seed})]\n{summary}")
-            tool_calls_log.append({"step": step, "tool": tool_name, "seed": tool_seed, "results": len(items)})
-            print(f"[agent] step {step}: {tool_name}({tool_seed}) → {len(items)} items")
+            all_evidence.append(f"[Tool {i+1} - {tool_name}({tool_seed})]\n{summary}")
+            tool_calls_log.append({"step": i+1, "tool": tool_name, "seed": tool_seed, "results": len(items)})
         except Exception as e:
-            print(f"[agent] step {step}: tool {action} error {e}")
-            history_parts.append(f"[Step {step} - {action}({tool_seed})] ERROR: {e}")
+            print(f"[agent] tool {action} error {e}")
 
-    # fallback: if agent didn't finish, force a report from collected evidence
-    print("[agent] max steps reached, forcing report")
-    signals_for_report = {}
-    report = build_research_report(seed, product, goal, signals_for_report)
+    # Pass 3: synthesize report
+    evidence_text = "\n\n".join(all_evidence)
+    system = """你是全渠道市场情报与SEO需求挖掘专家。你必须基于提供的工具调用证据输出中文Markdown报告。
+
+严格结构：
+# 市场机会分析报告
+## 1. 一句话机会判断
+## 2. 用户痛点与原声（引用证据中的用户原话）
+## 3. 竞品防线缺口
+## 4. 高意图关键词（12个：功能词/对比词/场景词）
+## 5. 内容切入点（8个标题）
+## 6. 下一步验证动作（5个）
+
+每条论断必须引用具体证据。输出不超过4000字。"""
+    report_prompt = f"""种子词：{seed}
+产品：{product}
+目标：{goal}
+
+多渠道信号证据：
+{evidence_text}
+
+请根据以上证据输出完整报告。"""
+    report = call_deepseek(report_prompt, system=system, max_tokens=3500)
+
     return {
         "ok": True,
         "seed": seed,
         "product": product,
         "goal": goal,
         "model": DEEPSEEK_MODEL,
-        "steps": MAX_STEPS,
+        "steps": len(tool_calls_log) + 2,
         "tool_calls": tool_calls_log,
         "report": report,
     }
