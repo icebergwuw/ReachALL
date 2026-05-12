@@ -34,10 +34,23 @@ class handler(BaseHTTPRequestHandler):
 
         try:
             from _lib import collect_research_signals, build_research_report, DEEPSEEK_MODEL
+
             signals = collect_research_signals(seed)
-            self._json({"ok": True, "signals_count": {k: len(v) for k, v in signals.items()}})
+            report = build_research_report(seed, product, goal, signals)
+
+            self._json({
+                "ok": True,
+                "seed": seed,
+                "product": product,
+                "goal": goal,
+                "model": DEEPSEEK_MODEL,
+                "updated_at": int(time.time()),
+                "signals": signals,
+                "report": report,
+            })
         except Exception as e:
-            import traceback; self._json({"ok": False, "error": str(e), "trace": traceback.format_exc()[:2000]}, 500)
+            import traceback
+            self._json({"ok": False, "error": str(e), "trace": traceback.format_exc()[-1500:]}, 500)
 
     def _json(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False).encode()
