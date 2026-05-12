@@ -1829,9 +1829,16 @@ async function handleResearch() {
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || '需求挖掘失败');
     researchReport = data.report || '';
+    // Show agent tool call log if present
+    const toolCalls = data.tool_calls || [];
+    if (toolCalls.length) {
+      const steps = toolCalls.map(tc => `Step ${tc.step}: ${tc.tool}("${tc.seed}") → ${tc.results} items`).join('\n');
+      const agentLog = `\n\n---\n## Agent 分析过程\n${steps}\n---\n`;
+      researchReport = agentLog + researchReport;
+    }
     output.textContent = researchReport;
     copyBtn.style.display = 'inline-flex';
-    showToast('需求挖掘完成');
+    showToast(`需求挖掘完成 (${data.steps || '?'} 步, ${toolCalls.length} 个工具调用)`);
 
     // 异步追加深度搜索证据
     const seedEl = document.getElementById('research-seed');

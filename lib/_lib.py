@@ -910,6 +910,184 @@ def _parse_json_object(text: str) -> dict:
     return json.loads(text)
 
 
+# ── Demand Research Agent (autonomous cycle) ──────────────────────────────────
+
+
+def _format_tool_result(name: str, items: list[dict]) -> str:
+    """Produce a compact text summary for one tool call result."""
+    if not items:
+        return f"({name}: 0 results)"
+    lines = [f"({name}: {len(items)} results)"]
+    for item in items[:5]:
+        title = item.get("title", "")
+        body = item.get("body", "") or item.get("selftext", "") or item.get("description", "") or ""
+        comments = item.get("comments", "")
+        pain = item.get("pain_categories") or {}
+        url = item.get("url", "")
+        lines.append(f"- {title} ({url})")
+        if body:
+            lines.append(f"  body: {body[:300]}")
+        if isinstance(comments, list) and comments:
+            for ci, c in enumerate(comments[:3]):
+                lines.append(f"  comment{ci+1}: {c[:200]}")
+        if isinstance(pain, dict):
+            active = {k: v for k, v in pain.items() if v}
+            if active:
+                lines.append(f"  pain_categories: {json.dumps(active, ensure_ascii=False)}")
+    return "\n".join(lines)
+
+
+TOOLS = {
+    "search_github_issues": lambda seed: ("github_issues", search_github_issues(seed)),
+    "search_reddit_posts": lambda seed: ("reddit_posts_v2", search_reddit_posts_v2(seed)),
+    "search_youtube_competitor": lambda seed: ("youtube_competitor", search_youtube_competitor(seed)),
+    "search_github_repo_issues": lambda seed: ("github_repo_issues", search_github_repo_issues()),
+    "search_twitter": lambda seed: ("twitter_search", search_twitter(seed)),
+}
+
+AGENT_TOOLS_JSON = [
+    {
+        "name": "search_github_issues",
+        "description": "Search GitHub issues using a keyword. Returns issue titles, bodies (pain/feature requests), repos, and comment counts. Best for finding user pain points and feature gaps in open source projects.",
+        "parameters": {"seed": "search keyword e.g. 'self-hosted automation'"}
+    },
+    {
+        "name": "search_reddit_posts",
+        "description": "Search Reddit posts and comments using a keyword. Returns post titles, selftext, and top comments (real user voices). Best for finding community sentiment and user complaints on r/SaaS, r/selfhosted, r/productivity etc.",
+        "parameters": {"seed": "search keyword e.g. 'Zapier too expensive'"}
+    },
+    {
+        "name": "search_youtube_competitor",
+        "description": "Search YouTube review/problem/alternative videos about a keyword/competitor, and extract top comments with pain points auto-categorized into: tech_barrier, execution_failure, pricing, missing_features. Best for finding competitor weaknesses from user comments.",
+        "parameters": {"seed": "query e.g. 'n8n review' or 'browser use alternative'"}
+    },
+    {
+        "name": "search_github_repo_issues",
+        "description": "Scan issues from 8 high-value repos: browser-use, Skyvern, n8n, Dify, Playwright, Crawl4AI, Stagehand, Scrapy. Returns top issues with high comment counts (3 per repo). Use when you need competitive intelligence on developer tools.",
+        "parameters": {}
+    },
+    {
+        "name": "search_twitter",
+        "description": "Search recent Twitter/X tweets using a keyword (English, no retweets). Returns tweet text, likes, retweets. Best for finding real-time user opinions and hot takes on competitors or pain points.",
+        "parameters": {"seed": "search keyword"}
+    },
+]
+
+AGENT_SYSTEM_PROMPT = """You are a Demand Research Agent — a senior market intelligence analyst specialized in finding user pain points and content opportunities for SEO and growth.
+
+## Your workflow
+You operate in a ReAct loop: Think → Act → Observe → (repeat) → Finish.
+
+At each step you MUST output valid JSON with exactly one of two formats:
+
+### Format A — call a tool
+{"action": "TOOL_NAME", "args": {"seed": "keyword"}}
+
+### Format B — deliver final report
+{"action": "finish", "report": "YOUR FULL MARKDOWN REPORT HERE"}
+
+## Available tools
+You have these search tools at your disposal:
+
+""" + json.dumps(AGENT_TOOLS_JSON, indent=2) + """
+
+## Rules
+1. You MUST call at least 3 different tools before finishing. Do NOT finish after 1 tool call — you need cross-channel evidence.
+2. When you call a tool, write ONLY the JSON. No explanation text before or after.
+3. Choose seed keywords strategically — vary them across tools to cover different angles (competitor names, pain words, use-case phrases).
+4. After collecting evidence from 3-5 tool calls, output your final report in format B.
+5. The final report must be in Chinese, structured as:
+   # 市场机会分析报告
+   ## 1. 一句话机会判断
+   ## 2. 用户痛点与原声 (quote real user language from the evidence)
+   ## 3. 竞品防线缺口
+   ## 4. 高意图关键词 (12 keywords: 功能词/对比词/场景词)
+   ## 5. 内容切入点 (8 titles)
+   ## 6. 下一步验证动作 (5 actions)
+6. Every claim must be backed by specific evidence you observed — cite URLs and user quotes.
+7. Be concise — the report must be under 4000 characters."""
+
+
+def _agent_step(seed: str, history: str, step: int) -> dict | None:
+    """One agent step: ask the model to decide next action, return parsed JSON or None."""
+    user_msg = f"""Seed keyword: "{seed}"
+Step {step}/10.
+
+Evidence collected so far:
+{history if history else "(no evidence yet — you MUST call tools)"}
+
+Decide your next action. Output ONLY the JSON (format A or B)."""
+    raw = call_deepseek(user_msg, system=AGENT_SYSTEM_PROMPT, max_tokens=800 if history else 400)
+    return _parse_json_object(raw)
+
+
+def run_demand_research_agent(seed: str, product: str = "EasyClaw", goal: str = "") -> dict:
+    """Run the autonomous demand research agent.
+
+    Returns {"ok": True/False, "tool_calls": [...], "report": str, "model": str}
+    """
+    MAX_STEPS = 8
+    history_parts = []
+    tool_calls_log = []
+
+    for step in range(1, MAX_STEPS + 1):
+        history_text = "\n".join(history_parts[-5000:])  # keep context window manageable
+        decision = _agent_step(seed, history_text, step)
+
+        if not decision:
+            print(f"[agent] step {step}: failed to parse decision, retrying")
+            continue
+
+        action = decision.get("action", "")
+
+        if action == "finish":
+            report = decision.get("report", "")
+            if not report or len(report) < 100:
+                print(f"[agent] step {step}: finish called but report too short, retrying")
+                continue
+            return {
+                "ok": True,
+                "seed": seed,
+                "product": product,
+                "goal": goal,
+                "model": DEEPSEEK_MODEL,
+                "steps": step,
+                "tool_calls": tool_calls_log,
+                "report": report,
+            }
+
+        if action not in TOOLS:
+            print(f"[agent] step {step}: unknown action '{action}', retrying")
+            continue
+
+        args = decision.get("args", {}) if isinstance(decision.get("args"), dict) else {}
+        tool_seed = args.get("seed", seed) or seed
+        try:
+            tool_name, items = TOOLS[action](tool_seed)
+            summary = _format_tool_result(tool_name, items)
+            history_parts.append(f"[Step {step} - {tool_name}({tool_seed})]\n{summary}")
+            tool_calls_log.append({"step": step, "tool": tool_name, "seed": tool_seed, "results": len(items)})
+            print(f"[agent] step {step}: {tool_name}({tool_seed}) → {len(items)} items")
+        except Exception as e:
+            print(f"[agent] step {step}: tool {action} error {e}")
+            history_parts.append(f"[Step {step} - {action}({tool_seed})] ERROR: {e}")
+
+    # fallback: if agent didn't finish, force a report from collected evidence
+    print("[agent] max steps reached, forcing report")
+    signals_for_report = {}
+    report = build_research_report(seed, product, goal, signals_for_report)
+    return {
+        "ok": True,
+        "seed": seed,
+        "product": product,
+        "goal": goal,
+        "model": DEEPSEEK_MODEL,
+        "steps": MAX_STEPS,
+        "tool_calls": tool_calls_log,
+        "report": report,
+    }
+
+
 def discover_seed_keywords(product: str = "EasyClaw", market: str = "AI Agent / Web Automation", competitors: list[str] = None) -> list[dict]:
     competitors = competitors or ["n8n", "Zapier", "Dify", "Browser Use", "OpenAI Operator", "Manus", "Skyvern", "Playwright", "Puppeteer"]
     signals = collect_research_signals(market)
