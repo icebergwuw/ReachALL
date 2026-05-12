@@ -1007,3 +1007,4 @@ def search_github_repo_issues() -> list[dict]:
         except Exception as e:
             print(f"[github_repo_issues {repo}] {e}")
             continue
+    return all_issues
