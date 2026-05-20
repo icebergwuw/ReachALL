@@ -17,11 +17,11 @@ class handler(BaseHTTPRequestHandler):
         topic_title     = body.get("topic_title", "")
         topic_heat      = body.get("topic_heat", "")
         topic_platform  = body.get("topic_platform", "weibo")
-        target_platform = body.get("target_platform", "weibo")
+        target_platform = body.get("target_platform", "xhs")
         tone            = body.get("tone", "营销种草")
         extra           = body.get("extra", "")
 
-        plat_guide = PLATFORM_GUIDES.get(target_platform, PLATFORM_GUIDES["weibo"])
+        plat_guide = PLATFORM_GUIDES.get(target_platform, PLATFORM_GUIDES["xhs"])
         tone_guide = TONE_GUIDES.get(tone, TONE_GUIDES["营销种草"])
 
         prompt = (
