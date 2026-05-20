@@ -640,10 +640,11 @@
     }
 
     .plat-select-btn:hover { background: var(--surface2); }
-    .plat-select-btn.active.wb { background: rgba(230,22,45,0.1); color: #e6162d; border-color: #e6162d; }
-    .plat-select-btn.active.dy { background: rgba(254,44,85,0.1); color: #fe2c55; border-color: #fe2c55; }
     .plat-select-btn.active.xhs { background: rgba(255,36,66,0.08); color: #ff6680; border-color: #ff6680; }
-    .plat-select-btn.active.wx { background: rgba(255,87,34,0.1); color: #FF5722; border-color: #FF5722; }
+    .plat-select-btn.active.wx  { background: rgba(255,87,34,0.1); color: #FF5722; border-color: #FF5722; }
+    .plat-select-btn.active.x   { background: #000; color: #fff; border-color: #000; }
+    .plat-select-btn.active.lv  { background: rgba(59,130,246,0.1); color: #3b82f6; border-color: #3b82f6; }
+    .plat-select-btn.active.sv  { background: rgba(168,85,247,0.1); color: #a855f7; border-color: #a855f7; }
 
     .form-textarea {
       width: 100%;
@@ -1176,16 +1177,11 @@
         <div class="form-row">
           <label class="form-label">发布平台</label>
           <div class="platform-grid">
-            <button class="plat-select-btn active wb" data-plat="weibo" onclick="selectPlat(this)">微博</button>
-            <button class="plat-select-btn dy" data-plat="douyin" onclick="selectPlat(this)">抖音</button>
-            <button class="plat-select-btn xhs" data-plat="xhs" onclick="selectPlat(this)">小红书</button>
+            <button class="plat-select-btn active xhs" data-plat="xhs" onclick="selectPlat(this)">小红书</button>
             <button class="plat-select-btn wx" data-plat="wechat" onclick="selectPlat(this)">微信公众号</button>
-            <button class="plat-select-btn" data-plat="github" onclick="selectPlat(this)">GitHub</button>
-            <button class="plat-select-btn" data-plat="reddit" onclick="selectPlat(this)">Reddit</button>
-            <button class="plat-select-btn" data-plat="hackernews" onclick="selectPlat(this)">HN</button>
-            <button class="plat-select-btn" data-plat="producthunt" onclick="selectPlat(this)">Product Hunt</button>
-            <button class="plat-select-btn" data-plat="youtube" onclick="selectPlat(this)">YouTube</button>
-            <button class="plat-select-btn" data-plat="google_trends" onclick="selectPlat(this)">Google Trends</button>
+            <button class="plat-select-btn x" data-plat="x" onclick="selectPlat(this)">X</button>
+            <button class="plat-select-btn lv" data-plat="longvideo" onclick="selectPlat(this)">长视频脚本</button>
+            <button class="plat-select-btn sv" data-plat="shortvideo" onclick="selectPlat(this)">短视频脚本</button>
           </div>
         </div>
 
@@ -1254,7 +1250,7 @@ let currentPlatFilter = 'all';
 let currentCategoryFilter = '';
 let library = JSON.parse(localStorage.getItem('reachall_library') || '[]');
 let currentTopic = null;
-let currentPlatform = 'weibo';
+let currentPlatform = 'xhs';
 let currentTone = '营销种草';
 let generatedText = '';
 let researchReport = '';
@@ -1276,6 +1272,10 @@ const PLAT_META = {
   youtube:  { label: 'YouTube', tagClass: 'tag-youtube' },
   google_trends: { label: 'Google Trends', tagClass: 'tag-google-trends' },
   twitter:  { label: 'X', tagClass: 'tag-twitter' },
+  // 发布目标平台（仅用于推文生成的 label 显示）
+  x:          { label: 'X' },
+  longvideo:  { label: '长视频脚本' },
+  shortvideo: { label: '短视频脚本' },
 };
 
 // ── SERVER STATUS ──
@@ -1563,14 +1563,16 @@ function selectTone(btn) {
 // ── GENERATE (simulated streaming with real prompt structure) ──
 
 const PLATFORM_GUIDES = {
-  weibo: { maxLen: 140, hashtagCount: 3, style: '简洁有力，适合转发，结尾加话题标签' },
-  douyin: { maxLen: 150, hashtagCount: 5, style: '口语化，引发互动，开头直接抓眼球' },
-  xhs: { maxLen: 300, hashtagCount: 6, style: '种草感强，真实分享语气，多用 emoji，标题党' }
+  xhs:        { maxLen: 500,  hashtagCount: 6, style: '种草感强，真实分享语气，多用 emoji，标题党不浮夸' },
+  wechat:     { maxLen: 2000, hashtagCount: 0, style: '专业深度长文，有故事有干货' },
+  x:          { maxLen: 280,  hashtagCount: 2, style: '英文输出，开头钩子，观点直接，1-2 个 hashtag' },
+  longvideo:  { maxLen: 1200, hashtagCount: 0, style: '5 分钟 B 站/YouTube 脚本，画面/口播/字幕三栏式' },
+  shortvideo: { maxLen: 400,  hashtagCount: 0, style: '15-30 秒短视频脚本，画面/口播两栏式，节奏快' }
 };
 
 function buildPromptPreview(topic, platform, tone, extra) {
-  const guide = PLATFORM_GUIDES[platform];
-  const platName = { weibo: '微博', douyin: '抖音', xhs: '小红书' }[platform];
+  const guide = PLATFORM_GUIDES[platform] || PLATFORM_GUIDES.xhs;
+  const platName = (PLAT_META[platform] || {}).label || platform;
   return `[${platName} · ${tone}]\n热点: ${topic.title}\n热度: ${topic.heatLabel}\n`;
 }
 

@@ -6,7 +6,7 @@ import json, sys, os
 from http.server import BaseHTTPRequestHandler
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'lib'))
-from _lib import search_github_issues, search_reddit_posts, search_youtube_videos, search_twitter
+from _lib import search_github_issues, search_reddit_posts_v2, search_youtube_competitor, search_twitter, search_github_repo_issues
 
 
 class handler(BaseHTTPRequestHandler):
@@ -39,16 +39,22 @@ class handler(BaseHTTPRequestHandler):
             print(f"[deep] github_issues: {e}")
 
         try:
-            signals["reddit_posts"] = search_reddit_posts(seed)
+            signals["reddit_posts"] = search_reddit_posts_v2(seed)
         except Exception as e:
             signals["reddit_posts"] = []
             print(f"[deep] reddit_posts: {e}")
 
         try:
-            signals["youtube_videos"] = search_youtube_videos(seed)
+            signals["youtube_competitor"] = search_youtube_competitor(seed)
         except Exception as e:
-            signals["youtube_videos"] = []
-            print(f"[deep] youtube_videos: {e}")
+            signals["youtube_competitor"] = []
+            print(f"[deep] youtube_competitor: {e}")
+
+        try:
+            signals["github_repo_issues"] = search_github_repo_issues()
+        except Exception as e:
+            signals["github_repo_issues"] = []
+            print(f"[deep] github_repo_issues: {e}")
 
         try:
             signals["twitter_search"] = search_twitter(seed)

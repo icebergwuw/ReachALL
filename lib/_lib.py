@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-共享工具函数 — 热榜抓取 + MiniMax 调用
+共享工具函数 — 热榜抓取 + DeepSeek 调用
 供 Vercel serverless functions 引用
 """
 
@@ -26,11 +26,7 @@ _UA_MOBILE = (
 TIMEOUT = 6
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY", "")
 
-# ── LLM providers ─────────────────────────────────────────────────────────────
-MINIMAX_API_KEY = os.environ.get("MINIMAX_API_KEY", "")
-MINIMAX_MODEL   = "MiniMax-M2.5-highspeed"
-MINIMAX_URL     = "https://api.minimax.chat/v1/text/chatcompletion_v2"
-
+# ── LLM provider ──────────────────────────────────────────────────────────────
 DEEPSEEK_API_KEY  = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL    = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
@@ -74,49 +70,52 @@ def call_deepseek(prompt: str, system: str = None, max_tokens: int = 4096) -> st
     return choices[0].get("message", {}).get("content", "").strip()
 
 
-def call_minimax(prompt: str, system: str = None, max_tokens: int = 4096) -> str:
-    messages = []
-    if system:
-        messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": prompt})
-
-    payload = json.dumps({
-        "model": MINIMAX_MODEL,
-        "messages": messages,
-        "max_tokens": max_tokens,
-    }).encode()
-
-    req = urllib.request.Request(MINIMAX_URL, data=payload, headers={
-        "Authorization": "Bearer " + MINIMAX_API_KEY,
-        "Content-Type": "application/json",
-    })
-    with urllib.request.urlopen(req, timeout=120) as r:
-        data = json.loads(r.read().decode())
-
-    base = data.get("base_resp", {})
-    if base.get("status_code", 0) != 0:
-        raise RuntimeError(f"MiniMax error {base.get('status_code')}: {base.get('status_msg')}")
-
-    choices = data.get("choices") or []
-    if not choices:
-        raise RuntimeError("MiniMax returned no choices")
-    return choices[0].get("message", {}).get("content", "").strip()
-
-
 # ── Prompts ───────────────────────────────────────────────────────────────────
+# 仅保留 5 个目标发布平台：小红书 / 微信公众号 / X / 长视频脚本 / 短视频脚本
 PLATFORM_GUIDES = {
-    "weibo":    {"name": "微博",   "max_len": 140, "style": "简洁有力，结尾加2-3个话题标签 #话题#"},
-    "douyin":   {"name": "抖音",   "max_len": 150, "style": "开头直接抓眼球，口语化，引发互动，结尾5个话题标签"},
-    "xhs":      {"name": "小红书", "max_len": 500, "style": "种草感强，真实分享语气，多用emoji，末尾6个话题标签"},
-    "bilibili": {"name": "B站",    "max_len": 200, "style": "二次元/科技向，有趣有深度，结尾@相关UP主方向"},
-    "v2ex":     {"name": "V2EX",  "max_len": 300, "style": "技术社区，干货为主，理性客观，程序员视角"},
-    "wechat":   {"name": "微信公众号", "max_len": 2000, "style": "专业深度，有故事有干货，适合长文"},
-    "github":   {"name": "GitHub", "max_len": 280, "style": "面向开发者，突出项目价值、技术亮点和可尝试场景"},
-    "reddit":   {"name": "Reddit", "max_len": 300, "style": "英文社区讨论感，观点直接，适合引发评论互动"},
-    "hackernews": {"name": "Hacker News", "max_len": 300, "style": "技术创业视角，理性克制，强调问题、洞察和可验证价值"},
-    "producthunt": {"name": "Product Hunt", "max_len": 260, "style": "新产品发布口吻，强调一句话价值、使用场景和行动号召"},
-    "youtube":  {"name": "YouTube", "max_len": 300, "style": "视频标题/简介风格，开头抓注意力，适合频道观众点击"},
-    "google_trends": {"name": "Google Trends", "max_len": 280, "style": "全球趋势解读，快速说明为什么火、和AI效率工具的关联"},
+    "xhs": {
+        "name": "小红书",
+        "max_len": 500,
+        "style": "种草感强，真实分享语气，多用 emoji，标题党但不浮夸，末尾 6 个话题标签 #标签#",
+    },
+    "wechat": {
+        "name": "微信公众号",
+        "max_len": 2000,
+        "style": "专业深度，有故事有干货，适合长文",
+    },
+    "x": {
+        "name": "X (Twitter)",
+        "max_len": 280,
+        "style": (
+            "用英文输出。开头一句话钩子，观点直接，1-2 个高相关 hashtag。"
+            "面向海外开发者 / AI 社区（n8n / Zapier / browser-use 等用户），"
+            "突出问题—洞察—可验证价值，避免硬广。"
+        ),
+    },
+    "longvideo": {
+        "name": "长视频脚本",
+        "max_len": 1200,
+        "style": (
+            "面向 5 分钟 B 站 / YouTube 视频。结构：\n"
+            "① 开场钩子（10-15 秒，提出读者真实痛点或反直觉观点）\n"
+            "② 背景与冲突（30-45 秒，结合当前热点说明 why now）\n"
+            "③ 主体 3 个段落（每段 60-90 秒：观点 + 故事/案例 + EasyClaw 自然出现）\n"
+            "④ 金句一句\n"
+            "⑤ CTA（订阅 / 评论 / 下载）\n"
+            "用【画面】【口播】【字幕】三栏式标注每一段，方便直接拍摄。"
+        ),
+    },
+    "shortvideo": {
+        "name": "短视频脚本",
+        "max_len": 400,
+        "style": (
+            "面向 15-30 秒抖音 / 小红书 / TikTok 短视频。结构：\n"
+            "① 0-3 秒钩子：一句直击痛点或反差感的话\n"
+            "② 4-20 秒主体：1 个具体场景 + EasyClaw 解法（口语化，节奏快）\n"
+            "③ 21-30 秒收束：金句 + CTA（评论 / 关注 / 主页领取）\n"
+            "用【画面】【口播】两栏标注每一段。文字总量控制在 400 字内。"
+        ),
+    },
 }
 
 TONE_GUIDES = {

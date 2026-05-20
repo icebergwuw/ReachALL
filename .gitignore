@@ -11,3 +11,6 @@ __pycache__/
 .deepvcode/
 .vscode/
 .vercel
+
+# AI agent memory（不提交）
+DEEPV.md

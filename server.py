@@ -343,11 +343,48 @@ import subprocess, shutil
 DVCODE_BIN = shutil.which("dvcode") or "/usr/local/bin/dvcode"
 
 PLATFORM_GUIDES = {
-    "weibo":    {"name": "微博",   "max_len": 140, "style": "简洁有力，结尾加2-3个话题标签 #话题#"},
-    "douyin":   {"name": "抖音",   "max_len": 150, "style": "开头直接抓眼球，口语化，引发互动，结尾5个话题标签"},
-    "xhs":      {"name": "小红书", "max_len": 500, "style": "种草感强，真实分享语气，多用emoji，末尾6个话题标签"},
-    "bilibili": {"name": "B站",    "max_len": 200, "style": "二次元/科技向，有趣有深度，结尾@相关UP主方向"},
-    "v2ex":     {"name": "V2EX",  "max_len": 300, "style": "技术社区，干货为主，理性客观，程序员视角"},
+    "xhs": {
+        "name": "小红书",
+        "max_len": 500,
+        "style": "种草感强，真实分享语气，多用 emoji，标题党不浮夸，末尾 6 个话题标签 #标签#",
+    },
+    "wechat": {
+        "name": "微信公众号",
+        "max_len": 2000,
+        "style": "专业深度，有故事有干货，适合长文",
+    },
+    "x": {
+        "name": "X (Twitter)",
+        "max_len": 280,
+        "style": (
+            "用英文输出。开头一句话钩子，观点直接，1-2 个高相关 hashtag。"
+            "面向海外开发者 / AI 社区，突出问题—洞察—可验证价值，避免硬广。"
+        ),
+    },
+    "longvideo": {
+        "name": "长视频脚本",
+        "max_len": 1200,
+        "style": (
+            "面向 5 分钟 B 站 / YouTube 视频。结构：\n"
+            "① 开场钩子（10-15 秒，提出真实痛点或反直觉观点）\n"
+            "② 背景与冲突（30-45 秒，结合热点说明 why now）\n"
+            "③ 主体 3 个段落（每段 60-90 秒：观点 + 故事/案例 + EasyClaw 自然出现）\n"
+            "④ 金句一句\n"
+            "⑤ CTA（订阅 / 评论 / 下载）\n"
+            "用【画面】【口播】【字幕】三栏式标注每一段。"
+        ),
+    },
+    "shortvideo": {
+        "name": "短视频脚本",
+        "max_len": 400,
+        "style": (
+            "面向 15-30 秒抖音 / 小红书 / TikTok 短视频。结构：\n"
+            "① 0-3 秒钩子：一句直击痛点或反差感的话\n"
+            "② 4-20 秒主体：1 个具体场景 + EasyClaw 解法（口语化，节奏快）\n"
+            "③ 21-30 秒收束：金句 + CTA\n"
+            "用【画面】【口播】两栏标注每一段。"
+        ),
+    },
 }
 
 TONE_GUIDES = {
@@ -368,38 +405,47 @@ EasyClaw 是猎豹移动出品的桌面 AI Agent 工具，基于 OpenClaw 框架
 你的任务：根据当前热点话题，为指定平台创作一条高质量推广内容，将 EasyClaw 的价值自然融入热点。
 要求：真实、自然、不硬广，符合各平台的内容生态。只输出正文内容，不要加任何前缀或解释。"""
 
-# ── LLM: MiniMax API ─────────────────────────────────────────────────────────
-MINIMAX_API_KEY = os.environ.get("MINIMAX_API_KEY", "")
-MINIMAX_MODEL   = "MiniMax-M2.5-highspeed"
-MINIMAX_URL     = "https://api.minimax.chat/v1/text/chatcompletion_v2"
+# ── LLM: DeepSeek API ────────────────────────────────────────────────────────
+DEEPSEEK_API_KEY  = os.environ.get("DEEPSEEK_API_KEY", "")
+DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+DEEPSEEK_MODEL    = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-flash")
+DEEPSEEK_URL      = DEEPSEEK_BASE_URL.rstrip("/") + "/chat/completions"
 
-def call_minimax(prompt: str, system: str = None, max_tokens: int = 4096) -> str:
-    """直接 HTTP 调用 MiniMax API，无进程启动开销"""
+def call_deepseek(prompt: str, system: str = None, max_tokens: int = 4096) -> str:
+    """直接 HTTP 调用 DeepSeek API"""
+    if not DEEPSEEK_API_KEY:
+        raise RuntimeError("DEEPSEEK_API_KEY is not configured")
+
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
     payload = json.dumps({
-        "model": MINIMAX_MODEL,
+        "model": DEEPSEEK_MODEL,
         "messages": messages,
         "max_tokens": max_tokens,
+        "temperature": 0.7,
     }).encode()
 
-    req = urllib.request.Request(MINIMAX_URL, data=payload, headers={
-        "Authorization": "Bearer " + MINIMAX_API_KEY,
+    req = urllib.request.Request(DEEPSEEK_URL, data=payload, headers={
+        "Authorization": "Bearer " + DEEPSEEK_API_KEY,
         "Content-Type": "application/json",
     })
-    with urllib.request.urlopen(req, timeout=120) as r:
-        data = json.loads(r.read().decode())
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            data = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", errors="replace")[:500]
+        raise RuntimeError(f"DeepSeek HTTP {e.code}: {detail}") from e
 
-    base = data.get("base_resp", {})
-    if base.get("status_code", 0) != 0:
-        raise RuntimeError(f"MiniMax error {base.get('status_code')}: {base.get('status_msg')}")
+    error = data.get("error")
+    if error:
+        raise RuntimeError(f"DeepSeek error: {error}")
 
     choices = data.get("choices") or []
     if not choices:
-        raise RuntimeError("MiniMax returned no choices")
+        raise RuntimeError("DeepSeek returned no choices")
     return choices[0].get("message", {}).get("content", "").strip()
 
 
@@ -490,15 +536,15 @@ class GenerateRequest(BaseModel):
     topic_title: str
     topic_heat: str = ""
     topic_platform: str = "weibo"
-    target_platform: str = "weibo"
+    target_platform: str = "xhs"
     tone: str = "营销种草"
     extra: str = ""
 
 
 @app.post("/api/generate")
 async def generate_post(req: GenerateRequest):
-    """调用 MiniMax 基于热点生成推文"""
-    plat_guide = PLATFORM_GUIDES.get(req.target_platform, PLATFORM_GUIDES["weibo"])
+    """调用 DeepSeek 基于热点生成推文"""
+    plat_guide = PLATFORM_GUIDES.get(req.target_platform, PLATFORM_GUIDES["xhs"])
     tone_guide = TONE_GUIDES.get(req.tone, TONE_GUIDES["营销种草"])
 
     prompt = f"""当前热点话题：「{req.topic_title}」（热度：{req.topic_heat}）
@@ -512,8 +558,8 @@ async def generate_post(req: GenerateRequest):
 请为 EasyClaw 创作一条紧扣热点、自然植入的{plat_guide['name']}推广内容。"""
 
     try:
-        text = await run_in_thread(lambda: call_minimax(prompt, system=SYSTEM_PROMPT))
-        return JSONResponse({"ok": True, "text": text, "model": MINIMAX_MODEL})
+        text = await run_in_thread(lambda: call_deepseek(prompt, system=SYSTEM_PROMPT))
+        return JSONResponse({"ok": True, "text": text, "model": DEEPSEEK_MODEL})
     except Exception as e:
         # fallback to dvcode
         try:
@@ -588,11 +634,11 @@ async def generate_wechat_article(req: WechatArticleRequest):
     prompt = _build_wechat_prompt(req)
 
     def _run():
-        # 优先 MiniMax（无进程开销，更快）
+        # 优先 DeepSeek（无进程开销，更快）
         try:
-            return call_minimax(prompt, system=WECHAT_SYSTEM_PROMPT, max_tokens=8192)
+            return call_deepseek(prompt, system=WECHAT_SYSTEM_PROMPT, max_tokens=8192)
         except Exception as e:
-            print(f"[wechat] MiniMax failed: {e}, fallback to dvcode", file=sys.stderr)
+            print(f"[wechat] DeepSeek failed: {e}, fallback to dvcode", file=sys.stderr)
         # fallback: dvcode
         result = subprocess.run(
             [DVCODE_BIN, "-p", WECHAT_SYSTEM_PROMPT + "\n\n" + prompt,
@@ -710,7 +756,7 @@ if __name__ == "__main__":
     print("Endpoints:")
     print("  GET  /api/trends           — all platforms")
     print("  GET  /api/trends/<name>    — single platform")
-    print("  POST /api/generate         — generate post with MiniMax")
+    print("  POST /api/generate         — generate post with DeepSeek")
     print("  POST /api/cache/clear      — flush cache")
     print("  GET  /api/health           — status")
     uvicorn.run(app, host="0.0.0.0", port=8765, log_level="info")
