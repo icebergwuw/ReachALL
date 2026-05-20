@@ -150,6 +150,22 @@
       border-radius: 10px;
     }
 
+    /* GT 子分类按钮（侧边栏内） */
+    #nav-gt-sub { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 10px 8px 28px; }
+    .gt-sub-btn {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      color: var(--text-mid);
+      cursor: pointer;
+      background: transparent;
+      transition: all 0.15s;
+    }
+    .gt-sub-btn:hover { border-color: var(--border-bright); color: var(--text); background: var(--surface2); }
+    .gt-sub-btn.active { background: var(--accent); color: #faf9f5; border-color: var(--accent); font-weight: 600; }
+
     .sidebar-bottom {
       padding: 16px 14px;
       border-top: 1px solid var(--border);
@@ -981,20 +997,29 @@
       <span style="margin-left:auto;font-family:'Space Mono',monospace;font-size:10px;color:var(--text-dim)" id="lib-count-nav">0</span>
     </div>
     <div class="nav-section-label" style="margin-top:20px">平台</div>
-    <div class="nav-item" onclick="filterPlatform('weibo')">
+    <div class="nav-item nav-plat active" data-plat="all" onclick="filterPlatform('all', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="2" y="2" width="5" height="5" rx="1"/>
+        <rect x="9" y="2" width="5" height="5" rx="1"/>
+        <rect x="2" y="9" width="5" height="5" rx="1"/>
+        <rect x="9" y="9" width="5" height="5" rx="1"/>
+      </svg>
+      全部
+    </div>
+    <div class="nav-item nav-plat" data-plat="weibo" onclick="filterPlatform('weibo', this)">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="#e6162d" stroke-width="1.5">
         <circle cx="8" cy="8" r="6"/>
         <path d="M5 10 Q8 6 11 9"/>
       </svg>
       微博热搜
     </div>
-    <div class="nav-item" onclick="filterPlatform('douyin')">
+    <div class="nav-item nav-plat" data-plat="douyin" onclick="filterPlatform('douyin', this)">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="#fe2c55" stroke-width="1.5">
         <path d="M10 2 v8 a3 3 0 1 1-2-2.8 V4 a5 5 0 0 0 2 .5"/>
       </svg>
       抖音热榜
     </div>
-    <div class="nav-item" onclick="filterPlatform('xhs')">
+    <div class="nav-item nav-plat" data-plat="xhs" onclick="filterPlatform('xhs', this)">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="#ff6680" stroke-width="1.5">
         <rect x="3" y="2" width="10" height="12" rx="2"/>
         <line x1="6" y1="6" x2="10" y2="6"/>
@@ -1002,7 +1027,7 @@
       </svg>
       小红书热点
     </div>
-    <div class="nav-item" onclick="filterPlatform('bilibili')">
+    <div class="nav-item nav-plat" data-plat="bilibili" onclick="filterPlatform('bilibili', this)">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="#00a1d6" stroke-width="1.5">
         <rect x="2" y="3" width="12" height="10" rx="2"/>
         <line x1="5" y1="1" x2="5" y2="4"/><line x1="11" y1="1" x2="11" y2="4"/>
@@ -1010,12 +1035,63 @@
       </svg>
       B站热门
     </div>
-    <div class="nav-item" onclick="filterPlatform('v2ex')">
+    <div class="nav-item nav-plat" data-plat="v2ex" onclick="filterPlatform('v2ex', this)">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="#7dd3fc" stroke-width="1.5">
         <circle cx="8" cy="8" r="6"/>
         <path d="M5 8h6M8 5l3 3-3 3"/>
       </svg>
       V2EX 热帖
+    </div>
+    <div class="nav-item nav-plat" data-plat="github" onclick="filterPlatform('github', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M8 1.5a6.5 6.5 0 0 0-2.05 12.66c.32.06.43-.14.43-.31v-1.1c-1.78.39-2.16-.86-2.16-.86-.29-.74-.71-.94-.71-.94-.58-.4.04-.39.04-.39.64.05.98.66.98.66.57.98 1.5.7 1.87.53.06-.41.22-.7.4-.86-1.42-.16-2.92-.71-2.92-3.16 0-.7.25-1.27.66-1.71-.07-.16-.29-.82.06-1.7 0 0 .54-.17 1.77.66a6.16 6.16 0 0 1 3.22 0c1.23-.83 1.77-.66 1.77-.66.35.88.13 1.54.06 1.7.41.44.66 1.01.66 1.71 0 2.46-1.5 3-2.93 3.16.23.2.43.58.43 1.18v1.74c0 .17.12.37.43.31A6.5 6.5 0 0 0 8 1.5z"/>
+      </svg>
+      GitHub Trending
+    </div>
+    <div class="nav-item nav-plat" data-plat="reddit" onclick="filterPlatform('reddit', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="#ff4500" stroke-width="1.5">
+        <circle cx="8" cy="9" r="5"/>
+        <circle cx="13" cy="4" r="1.2"/>
+        <line x1="8" y1="3" x2="12" y2="4"/>
+        <circle cx="6" cy="9" r="0.6" fill="#ff4500"/>
+        <circle cx="10" cy="9" r="0.6" fill="#ff4500"/>
+      </svg>
+      Reddit
+    </div>
+    <div class="nav-item nav-plat" data-plat="hackernews" onclick="filterPlatform('hackernews', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="#ff6600" stroke-width="1.5">
+        <rect x="2" y="2" width="12" height="12" rx="1.5"/>
+        <path d="M5 5l3 4 3-4M8 9v3"/>
+      </svg>
+      Hacker News
+    </div>
+    <div class="nav-item nav-plat" data-plat="producthunt" onclick="filterPlatform('producthunt', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="#da552f" stroke-width="1.5">
+        <circle cx="8" cy="8" r="6"/>
+        <path d="M6 5v6M6 5h2.5a1.5 1.5 0 0 1 0 3H6"/>
+      </svg>
+      Product Hunt
+    </div>
+    <div class="nav-item nav-plat" data-plat="youtube" onclick="filterPlatform('youtube', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="#ff0000" stroke-width="1.5">
+        <rect x="1.5" y="3.5" width="13" height="9" rx="2"/>
+        <polygon points="7,6 11,8 7,10" fill="#ff0000"/>
+      </svg>
+      YouTube
+    </div>
+    <div class="nav-item nav-plat" data-plat="google_trends" onclick="filterPlatform('google_trends', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="#4285f4" stroke-width="1.5">
+        <path d="M2 13l4-5 3 3 5-7"/>
+        <circle cx="13" cy="4" r="1"/>
+      </svg>
+      Google Trends
+    </div>
+    <div id="nav-gt-sub" style="display:none;padding:0 10px 4px;"></div>
+    <div class="nav-item nav-plat" data-plat="twitter" onclick="filterPlatform('twitter', this)">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M9.5 7.2L13.7 2.5h-1.4L9 6.6 6.4 2.5H2.5l4.4 6.4-4.4 4.6h1.4l3.6-3.7 2.7 3.7h3.9L9.5 7.2zm-1.3 1.4l-.5-.7-3.8-5.4h2.1L8.5 6l.5.7 4.1 5.7H11l-2.8-4z"/>
+      </svg>
+      X (Twitter)
     </div>
   </nav>
   <div class="sidebar-bottom">
@@ -1031,23 +1107,6 @@
   <div class="topbar">
     <div class="topbar-title" id="view-title">实时热榜</div>
     <div class="topbar-right">
-      <div class="platform-filter" id="pf-filter">
-        <button class="pf-btn active" onclick="setPlatformFilter('all', this)">全部</button>
-        <button class="pf-btn wb" onclick="setPlatformFilter('weibo', this)">微博</button>
-        <button class="pf-btn dy" onclick="setPlatformFilter('douyin', this)">抖音</button>
-        <button class="pf-btn xhs" onclick="setPlatformFilter('xhs', this)">小红书</button>
-        <button class="pf-btn bili" onclick="setPlatformFilter('bilibili', this)">B站</button>
-        <button class="pf-btn v2" onclick="setPlatformFilter('v2ex', this)">V2EX</button>
-        <button class="pf-btn gh" onclick="setPlatformFilter('github', this)">GitHub</button>
-        <button class="pf-btn rd" onclick="setPlatformFilter('reddit', this)">Reddit</button>
-        <button class="pf-btn hn" onclick="setPlatformFilter('hackernews', this)">HN</button>
-        <button class="pf-btn ph" onclick="setPlatformFilter('producthunt', this)">Product Hunt</button>
-        <button class="pf-btn yt" onclick="setPlatformFilter('youtube', this)">YouTube</button>
-        <button class="pf-btn gt" onclick="setPlatformFilter('google_trends', this)">Google Trends</button>
-        <button class="pf-btn tw" onclick="setPlatformFilter('twitter', this)">X</button>
-      </div>
-      <div class="platform-filter" id="gt-sub-filter" style="display:none;margin-top:6px;flex-wrap:wrap;gap:5px">
-      </div>
       <button class="refresh-btn" id="refresh-btn" onclick="loadTrends()">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
           <path d="M14 8A6 6 0 1 1 8 2a6 6 0 0 1 4.24 1.76L14 2v4h-4l1.5-1.5"/>
@@ -1445,40 +1504,45 @@ function renderTrends() {
 
 // ── FILTER ──
 
-function setPlatformFilter(plat, btn) {
+function filterPlatform(plat, btn) {
   currentPlatFilter = plat;
   currentCategoryFilter = '';
-  document.querySelectorAll('.pf-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  const sub = document.getElementById('gt-sub-filter');
+
+  // 切换侧边栏 active 态
+  document.querySelectorAll('.nav-plat').forEach(b => b.classList.remove('active'));
+  if (btn) {
+    btn.classList.add('active');
+  } else {
+    document.querySelector(`.nav-plat[data-plat="${plat}"]`)?.classList.add('active');
+  }
+
+  // GT 子分类下拉
+  const sub = document.getElementById('nav-gt-sub');
   if (sub) {
     if (plat === 'google_trends') {
-      sub.style.display = 'flex';
+      sub.style.display = 'block';
       const cats = [...new Set(allTrends.filter(t => t.platform === 'google_trends').map(t => t.category || '').filter(Boolean))].sort();
-      sub.innerHTML = '<span class="pf-btn active" style="font-size:11px;padding:3px 9px;border-radius:99px" onclick="setGtSubFilter(\'\', this)">All GT</span>' +
-        cats.map(c => `<span class="pf-btn" style="font-size:11px;padding:3px 9px;border-radius:99px" onclick="setGtSubFilter('${c.replace(/'/g, "\\'")}', this)">${escapeHtml(c)}</span>`).join('');
+      sub.innerHTML = '<span class="gt-sub-btn active" onclick="setGtSubFilter(\'\', this)">All</span>' +
+        cats.map(c => `<span class="gt-sub-btn" onclick="setGtSubFilter('${c.replace(/'/g, "\\'")}', this)">${escapeHtml(c)}</span>`).join('');
     } else {
       sub.style.display = 'none';
     }
   }
+
+  switchView('trends', document.querySelectorAll('.nav-item')[0]);
   applyFilter();
 }
 
 function setGtSubFilter(cat, btn) {
   currentCategoryFilter = cat;
-  document.querySelectorAll('#gt-sub-filter .pf-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#nav-gt-sub .gt-sub-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   applyFilter();
 }
 
-function filterPlatform(plat) {
-  currentPlatFilter = plat;
-  document.querySelectorAll('.pf-btn').forEach(b => b.classList.remove('active'));
-  const map = { weibo: 1, douyin: 2, xhs: 3, bilibili: 4, v2ex: 5, github: 6, reddit: 7, hackernews: 8, producthunt: 9, youtube: 10, google_trends: 11, twitter: 12 };
-  const idx = map[plat];
-  if (idx !== undefined) document.querySelectorAll('.pf-btn')[idx]?.classList.add('active');
-  switchView('trends', document.querySelectorAll('.nav-item')[0]);
-  applyFilter();
+// 兼容老调用：setPlatformFilter -> filterPlatform
+function setPlatformFilter(plat, btn) {
+  filterPlatform(plat, document.querySelector(`.nav-plat[data-plat="${plat}"]`));
 }
 
 // ── VIEWS ──
@@ -1486,14 +1550,12 @@ function filterPlatform(plat) {
 function switchView(view, navEl) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + view).classList.add('active');
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  if (navEl) navEl.classList.add('active');
+  // 只清视图类 nav-item，保留侧边栏底部的平台筛选 active 态
+  document.querySelectorAll('.nav-item:not(.nav-plat)').forEach(n => n.classList.remove('active'));
+  if (navEl && !navEl.classList.contains('nav-plat')) navEl.classList.add('active');
 
   const titles = { trends: '实时热榜', research: '需求挖掘', library: '推文库' };
   document.getElementById('view-title').textContent = titles[view] || view;
-
-  const pfFilter = document.getElementById('pf-filter');
-  pfFilter.style.display = view === 'trends' ? 'flex' : 'none';
 
   if (view === 'library') renderLibrary();
 }
@@ -1701,6 +1763,8 @@ async function generateWechat() {
       <pre style="margin-top:12px;font-size:11px;color:var(--text-dim);max-height:120px;overflow:auto;white-space:pre-wrap;">${escapeHtml(data.html.slice(0, 300))}…</pre>
     `;
     document.getElementById('char-count').textContent = `HTML ${data.html.length} 字节`;
+    document.getElementById('save-btn').style.display = 'flex';
+    document.getElementById('copy-btn').style.display = 'flex';
 
   } catch(e) {
     outputEl.textContent = '生成失败：' + (e.message || '请检查后端服务');
@@ -1933,13 +1997,13 @@ function renderLibrary() {
     return;
   }
 
-  const platName = { weibo: '微博', douyin: '抖音', xhs: '小红书' };
-  const platClass = { weibo: 'tag-weibo', douyin: 'tag-douyin', xhs: 'tag-xhs' };
+  const platName = { weibo: '微博', douyin: '抖音', xhs: '小红书', wechat: '微信公众号', x: 'X', longvideo: '长视频脚本', shortvideo: '短视频脚本' };
+  const platClass = { weibo: 'tag-weibo', douyin: 'tag-douyin', xhs: 'tag-xhs', wechat: 'tag-wechat', x: 'tag-twitter', longvideo: 'tag-bili', shortvideo: 'tag-douyin' };
 
   grid.innerHTML = library.map(entry => `
     <div class="lib-card">
       <div class="lib-card-header">
-        <span class="lib-card-platform platform-tag ${(PLAT_META[entry.platform] || PLAT_META.weibo).tagClass}">${(PLAT_META[entry.platform] || {label: entry.platform}).label} · ${entry.tone}</span>
+        <span class="lib-card-platform platform-tag ${platClass[entry.platform] || (PLAT_META[entry.platform] || {}).tagClass || 'tag-weibo'}">${platName[entry.platform] || (PLAT_META[entry.platform] || {}).label || entry.platform} · ${entry.tone}</span>
         <span class="lib-card-date">${entry.createdAt}</span>
       </div>
       <div class="lib-card-content">${entry.content}</div>
