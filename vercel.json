@@ -13,6 +13,16 @@
       "config": { "runtime": "python3.11", "maxDuration": 60 }
     },
     {
+      "src": "api/generate/wechat/article.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.11", "maxDuration": 30 }
+    },
+    {
+      "src": "api/generate/wechat/layout.py",
+      "use": "@vercel/python",
+      "config": { "runtime": "python3.11", "maxDuration": 45 }
+    },
+    {
       "src": "api/trends.py",
       "use": "@vercel/python",
       "config": { "runtime": "python3.11", "maxDuration": 30 }
@@ -39,13 +49,15 @@
     }
   ],
   "routes": [
-    { "src": "/api/trends",          "dest": "/api/trends.py" },
-    { "src": "/api/generate/wechat", "dest": "/api/generate/wechat.py" },
-    { "src": "/api/generate",        "dest": "/api/generate.py" },
-    { "src": "/api/search/deep",     "dest": "/api/search/deep.py" },
-    { "src": "/api/seeds/discover", "dest": "/api/seeds/discover.py" },
-    { "src": "/api/research",        "dest": "/api/research.py" },
-    { "src": "/api/health",          "dest": "/api/health.py" },
-    { "src": "/(.*)",                "dest": "/index.html" }
+    { "src": "/api/trends",                  "dest": "/api/trends.py" },
+    { "src": "/api/generate/wechat/article", "dest": "/api/generate/wechat/article.py" },
+    { "src": "/api/generate/wechat/layout",  "dest": "/api/generate/wechat/layout.py" },
+    { "src": "/api/generate/wechat",         "dest": "/api/generate/wechat.py" },
+    { "src": "/api/generate",                "dest": "/api/generate.py" },
+    { "src": "/api/search/deep",             "dest": "/api/search/deep.py" },
+    { "src": "/api/seeds/discover",          "dest": "/api/seeds/discover.py" },
+    { "src": "/api/research",                "dest": "/api/research.py" },
+    { "src": "/api/health",                  "dest": "/api/health.py" },
+    { "src": "/(.*)",                        "dest": "/index.html" }
   ]
 }
