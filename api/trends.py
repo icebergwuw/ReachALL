@@ -1,5 +1,5 @@
 """
-GET /api/trends?platform=all|weibo|bilibili|douyin|v2ex|github|reddit|hackernews|producthunt|youtube|google_trends|twitter
+GET /api/trends?platform=all|weibo|bilibili|douyin|v2ex|xhs|github|reddit|hackernews|producthunt|youtube|google_trends|twitter
 """
 import json, sys, os, time
 from http.server import BaseHTTPRequestHandler
@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'lib'))
 from _lib import (
-    fetch_weibo, fetch_bilibili, fetch_douyin, fetch_v2ex,
+    fetch_weibo, fetch_bilibili, fetch_douyin, fetch_v2ex, fetch_xhs,
     fetch_github, fetch_reddit, fetch_hackernews, fetch_producthunt,
     fetch_youtube, fetch_google_trends, fetch_twitter,
 )
@@ -18,6 +18,7 @@ FETCHERS = {
     "bilibili":      fetch_bilibili,
     "douyin":        fetch_douyin,
     "v2ex":          fetch_v2ex,
+    "xhs":           fetch_xhs,
     "github":        fetch_github,
     "reddit":        fetch_reddit,
     "hackernews":    fetch_hackernews,

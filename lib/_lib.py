@@ -266,6 +266,118 @@ def fetch_v2ex() -> list[dict]:
         return []
 
 
+def fetch_xhs() -> list[dict]:
+    """小红书热点
+    优先：env XHS_WEB_SESSION + XHS_ID_TOKEN cookie 调官方 web search
+    降级：第三方聚合 API（imsyy / vvhan）
+    """
+    web_session = os.environ.get("XHS_WEB_SESSION", "").strip()
+    id_token    = os.environ.get("XHS_ID_TOKEN", "").strip()
+
+    if web_session and id_token:
+        try:
+            return _fetch_xhs_official(web_session, id_token)
+        except Exception as e:
+            print(f"[xhs] official failed: {e}, fallback to public api")
+
+    return _fetch_xhs_public()
+
+
+def _fetch_xhs_official(web_session: str, id_token: str) -> list[dict]:
+    keywords = ["AI工具", "效率工具"]
+    cookie_header = f"web_session={web_session}; id_token={id_token}"
+    result = []
+    rank = 1
+
+    for kw in keywords:
+        url = (
+            "https://www.xiaohongshu.com/api/sns/web/v1/search/notes"
+            f"?keyword={quote(kw)}&page=1&page_size=8&sort=hot&note_type=0"
+        )
+        try:
+            data = _fetch_json(url, headers={
+                "User-Agent": _UA_DESKTOP,
+                "Referer": "https://www.xiaohongshu.com",
+                "Cookie": cookie_header,
+                "Accept": "application/json",
+            })
+        except Exception as e:
+            print(f"[xhs] keyword={kw} {e}")
+            continue
+
+        items = (data.get("data") or {}).get("items") or []
+        for item in items:
+            note = item.get("note_card") or item
+            title = note.get("display_title") or note.get("title") or ""
+            if not title:
+                continue
+            interact = note.get("interact_info") or {}
+            likes = interact.get("liked_count", "0")
+            try:
+                heat = int(str(likes).replace("万", "0000").replace("+", ""))
+            except Exception:
+                heat = 0
+            note_id = note.get("note_id") or item.get("id", "")
+            result.append({
+                "id": f"xhs_{note_id}",
+                "platform": "xhs",
+                "rank": rank,
+                "title": title,
+                "heat": heat,
+                "heatLabel": f"{likes} 赞",
+                "category": kw,
+                "url": f"https://www.xiaohongshu.com/explore/{note_id}",
+            })
+            rank += 1
+
+    if not result:
+        raise RuntimeError("official api returned 0 items (cookie expired?)")
+    return result
+
+
+def _fetch_xhs_public() -> list[dict]:
+    candidates = [
+        ("imsyy", "https://api-hot.imsyy.top/xhs?cache=true"),
+        ("vvhan", "https://api.vvhan.com/api/hotlist/xhs"),
+    ]
+    for source, url in candidates:
+        try:
+            data = _fetch_json(url, headers={"User-Agent": _UA_DESKTOP})
+        except Exception as e:
+            print(f"[xhs/{source}] {e}")
+            continue
+
+        items = data.get("data") or []
+        if not items:
+            continue
+
+        result = []
+        for i, item in enumerate(items[:20]):
+            title = item.get("title") or item.get("name") or ""
+            if not title:
+                continue
+            hot = item.get("hot") or item.get("heat") or item.get("hotValue") or ""
+            try:
+                heat = int(str(hot).replace("万", "0000").replace(",", "").strip() or 0)
+            except Exception:
+                heat = 0
+            result.append({
+                "id": f"xhs_{source}_{i}",
+                "platform": "xhs",
+                "rank": i + 1,
+                "title": title,
+                "heat": heat,
+                "heatLabel": f"{hot}" if hot else "",
+                "category": "",
+                "url": item.get("url") or item.get("mobileUrl") or "",
+            })
+        if result:
+            return result
+
+    print("[xhs] all public api failed, returning empty")
+    return []
+
+
 def fetch_github() -> list[dict]:
     try:
         since = (_dt.date.today() - _dt.timedelta(days=14)).isoformat()
